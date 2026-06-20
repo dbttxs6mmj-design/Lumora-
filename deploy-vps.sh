@@ -64,21 +64,43 @@ fi
 echo "▶ 更新依賴（venv pip）..."
 "$VENV_PIP" install -q -r "$REPO_DIR/requirements.txt"
 
-echo "▶ 重啟服務 (需要 sudo)..."
+echo "▶ 重啟 uvicorn 服務 (需要 sudo)..."
 sudo systemctl restart "$SERVICE_NAME"
+
+# ── 重啟反向代理（nginx / caddy；whoever is active）──
+_restart_proxy() {
+  for PROXY in nginx caddy apache2 httpd; do
+    if systemctl is-active --quiet "$PROXY" 2>/dev/null; then
+      echo "▶ 重啟反向代理：$PROXY"
+      sudo systemctl restart "$PROXY"
+      return 0
+    fi
+    # 若代理存在但非 active（可能就是它沒在跑導致外部 502）
+    if systemctl list-units --type=service --all 2>/dev/null | grep -q "^  $PROXY.service"; then
+      echo "▶ $PROXY 存在但未 active，嘗試啟動..."
+      sudo systemctl start "$PROXY" && return 0
+    fi
+  done
+  echo "  (未偵測到 nginx/caddy/apache，跳過反向代理重啟)"
+}
+_restart_proxy
 sleep 3
 
 ACTIVE=$(systemctl is-active "$SERVICE_NAME")
-echo "▶ 服務狀態：$ACTIVE"
+echo "▶ lumora 服務狀態：$ACTIVE"
 
-echo "▶ 健康檢查 $HEALTH_URL"
+echo "▶ 內部健康檢查 $HEALTH_URL"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL")
 echo "  HTTP $HTTP_CODE"
 
 if [ "$ACTIVE" = "active" ] && [ "$HTTP_CODE" = "200" ]; then
   echo "✓ 部署完成 ($AFTER)"
+  echo ""
+  echo "若瀏覽器仍顯示錯誤，請執行："
+  echo "  sudo nginx -t && sudo systemctl status nginx"
+  echo "  或：sudo systemctl status caddy"
 else
-  echo "✗ 健康檢查失敗，建議查 log：" >&2
+  echo "✗ 健康檢查失敗，查 log：" >&2
   echo "  sudo journalctl -u $SERVICE_NAME -n 30 --no-pager" >&2
   exit 1
 fi
