@@ -617,6 +617,8 @@
         const divineQuestion = visionDesc
           ? `${question}\n\n【用戶上傳圖片（Vision 解析）】\n${visionDesc}`
           : question;
+        // 把 vision 描述寫回 userMsg，確保後續 history 帶著「他是誰」
+        if (visionDesc) { userMsg.content = divineQuestion; saveState(); }
         const res = _authGuard(await fetch(`${API_BASE}/divine`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -631,10 +633,13 @@
         }));
         data = await res.json();
         if (data.status === "ok" && data.result) {
+          const r = data.result;
+          // 存 core_conclusion + state，讓下一輪 LLM 知道前一輪討論的對象與結論
+          const assistantContent = [r.core_conclusion, r.state].filter(Boolean).join("\n");
           chat.messages.push({
             role: "assistant",
-            content: data.result.core_conclusion || "",
-            result: data.result,
+            content: assistantContent || "",
+            result: r,
             meta: data._meta,
           });
         } else if (data.detail) {
