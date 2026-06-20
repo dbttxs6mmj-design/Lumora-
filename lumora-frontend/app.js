@@ -15,6 +15,12 @@
   // i18n 捷徑：t("key") / t("key", {name:"…"})；i18n.js 未載入時回 key 本身
   const t = (k, vars) => (window.LUMORA_I18N ? window.LUMORA_I18N.t(k, vars) : k);
 
+  // 401 → nginx Basic Auth 憑證過期：navigate 到根目錄重新觸發登入框
+  function _reAuthIfNeeded(res) {
+    if (res.status === 401) { location.replace(location.origin + "/"); return true; }
+    return false;
+  }
+
   // ==================================================================
   // State
   // ==================================================================
@@ -491,6 +497,7 @@
             use_thinking: false,
           }),
         });
+        if (_reAuthIfNeeded(res)) return;
         data = await res.json();
         if (data.status === "ok" && data.result) {
           chat.messages.push({
@@ -516,6 +523,7 @@
             language: state.lang,
           }),
         });
+        if (_reAuthIfNeeded(res)) return;
         data = await res.json();
         if (data.status === "ok" && data.reply) {
           chat.messages.push({ role: "assistant", content: data.reply });
@@ -639,6 +647,7 @@
   async function loadEnginesInfo() {
     try {
       const res = await fetch(`${API_BASE}/engines`, { credentials: "include" });
+      if (_reAuthIfNeeded(res)) return;
       const data = await res.json();
       state.enginesMeta = data;
       // 寫進關於頁
