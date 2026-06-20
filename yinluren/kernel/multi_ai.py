@@ -23,7 +23,7 @@ def _ask_claude(question: str, profile_summary: str, api_key: str) -> str:
     """透過 Anthropic SDK 呼叫 Claude，取得補充視角。"""
     try:
         import anthropic
-        model = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+        model = os.environ.get("ANTHROPIC_MODEL", "claude-fable-5")
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model=model,
