@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Optional, Literal, Dict, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,14 @@ from yinluren.kernel.llm_divination import run_llm_divination
 from yinluren.ui_i18n import get_bundle as _ui_get_bundle, is_rtl as _ui_is_rtl
 
 router = APIRouter()
+
+# ─── Rate limit helper（從 main 匯入，不破壞啟動順序）───
+def _rate_limit_divine(request: Request):
+    try:
+        from yinluren.main import rate_limit
+        rate_limit(request, limit=int(os.environ.get("RATE_LIMIT_DIVINE", "20")), window_sec=60)
+    except Exception:
+        pass  # 靜默降級：rate limiter 失敗不影響正常請求
 
 UNCERTAIN_TIME = "不確定"
 SELF_PROFILE_LABEL = "我的命單"
@@ -663,7 +671,7 @@ def list_engine_summary():
 
 
 @router.post("/api/v1/divine", tags=["divine"])
-def divine_inline(payload: DivineInlineIn):
+def divine_inline(payload: DivineInlineIn, _rl: None = Depends(_rate_limit_divine)):
     """聊天式單次推演：接受 inline profile + chat_history，內部走 V7.6 Final Kernel。"""
     backend_profile = _ui_profile_to_backend(payload.profile)
     history = _sanitize_inline_history(payload.chat_history)
@@ -710,7 +718,7 @@ class ChatIn(BaseModel):
 
 
 @router.post("/api/v1/chat", tags=["chat"])
-def chat_inline(payload: ChatIn):
+def chat_inline(payload: ChatIn, _rl: None = Depends(_rate_limit_divine)):
     """閒聊／諮詢／日常對話（非命理推演），使用 instant 模型快速回應。"""
     import os as _os
     api_key = _os.environ.get("OPENAI_API_KEY")
@@ -769,13 +777,13 @@ def chat_inline(payload: ChatIn):
 
 
 class VisionIn(BaseModel):
-    image_b64: str = Field(..., min_length=10)
-    question: Optional[str] = None
+    image_b64: str = Field(..., min_length=10, max_length=10_000_000)  # ~7.5 MB 上限
+    question: Optional[str] = Field(default=None, max_length=500)
     language: Optional[str] = None
 
 
 @router.post("/api/v1/vision/analyze", tags=["vision"])
-def vision_analyze(payload: VisionIn):
+def vision_analyze(payload: VisionIn, _rl: None = Depends(_rate_limit_divine)):
     """圖片 Vision 分析：面相 / 手相 / 場景 / 文字，回傳描述供前端顯示或進一步推演。"""
     import os as _os
     api_key = _os.environ.get("OPENAI_API_KEY")

@@ -7,10 +7,15 @@
 (function () {
   "use strict";
 
-  // 後端 API：本地兩服務模式(前端 :5173)→ 打 :8000；同源模式(FastAPI 直供／部署)→ 同源 /api/v1
-  const API_BASE = (location.port === "5173")
-    ? `${location.protocol}//${location.hostname}:8000/api/v1`
-    : `${location.origin}/api/v1`;
+  // 後端 API 位址：
+  //   LUMORA_API_BASE  → 由部署平台注入（Vercel 環境變數 → window.__LUMORA_API__）
+  //   本地開發 :5173   → 打同機 :8000
+  //   同源（Render/VPS 單服務模式）→ 同源 /api/v1
+  const API_BASE = (
+    (window.__LUMORA_API__ || "").trim()         // Vercel/CDN 注入
+    || (location.port === "5173" ? `${location.protocol}//${location.hostname}:8000/api/v1` : "")
+    || `${location.origin}/api/v1`
+  );
 
   // i18n 捷徑：t("key") / t("key", {name:"…"})；i18n.js 未載入時回 key 本身
   const t = (k, vars) => (window.LUMORA_I18N ? window.LUMORA_I18N.t(k, vars) : k);

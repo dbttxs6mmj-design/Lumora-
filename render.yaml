@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: lumora-backend
+    runtime: python
+    region: singapore        # 最接近台灣/東南亞的 Render 節點
+    plan: free               # 可升 starter($7/mo) 解除冷啟動限制
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn yinluren.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/engines
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false          # 在 Render Dashboard 手動填入
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false          # 填 Vercel 前端網址，如 https://lumora.vercel.app
+      - key: RATE_LIMIT_DIVINE
+        value: "20"          # 每 IP 每分鐘最多 20 次推演
+      - key: TIER_ROUTER
+        value: "llm"
