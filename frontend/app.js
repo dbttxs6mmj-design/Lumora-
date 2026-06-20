@@ -771,11 +771,8 @@
     });
     preview.appendChild(img);
     preview.appendChild(rmBtn);
-    // Insert above the composer of the currently visible screen
-    const activeScreen = document.querySelector(".screen.active");
-    const composer = (activeScreen && activeScreen.querySelector(".composer"))
-      || document.querySelector("#screen-chat .composer");
-    if (composer) composer.parentNode.insertBefore(preview, composer);
+    // Append to body — CSS position:fixed pins it above the composer on any screen
+    document.body.appendChild(preview);
     preview.querySelector("img").src = _pendingImage.dataUrl;
   }
 
