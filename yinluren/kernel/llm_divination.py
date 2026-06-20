@@ -13,11 +13,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logger = logging.getLogger(__name__)
 
 try:
     from zoneinfo import ZoneInfo
@@ -57,6 +60,11 @@ RESPONSES_API_PREFIXES = ("gpt-5",)
 _TIER_ENV = {"instant": "OPENAI_MODEL_INSTANT", "thinking": "OPENAI_MODEL_THINKING"}
 _TIER_DEFAULT = {"instant": DEFAULT_MODEL_INSTANT, "thinking": DEFAULT_MODEL_THINKING}
 _TIER_CHAIN = {"instant": FALLBACK_CHAIN_INSTANT, "thinking": FALLBACK_CHAIN_THINKING}
+
+_THIRD_PARTY_MARKERS = (
+    "他", "她", "此人", "這個人", "這位", "圖中", "照片中", "圖片中",
+    "這張", "對方", "那個人", "他的", "她的", "他們",
+)
 
 # ── _classify_tier 三維度詞庫（instant ⇄ thinking 主動切換）──
 # 深度：重大人生命題、或明確要求深入完整 → thinking
@@ -565,7 +573,6 @@ def run_llm_divination(
     _augment_section = ("\n\n" + "\n\n".join(_augment_parts) + "\n") if _augment_parts else ""
 
     # ─── 圖片 vision 描述注入 ───
-    _THIRD_PARTY_MARKERS = ("他", "她", "此人", "這個人", "這位", "圖中", "照片中", "圖片中", "這張", "對方", "那個人", "他的", "她的", "他們")
     _is_third_party = bool(image_b64) and any(m in question for m in _THIRD_PARTY_MARKERS)
     _vision_section = ""
     if image_b64:
