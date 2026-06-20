@@ -693,6 +693,79 @@ def divine_inline(payload: DivineInlineIn):
     }
 
 
+class ChatIn(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    profile: Optional[Dict[str, Any]] = None
+    chat_history: Optional[list] = None
+    language: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _strip_message(self):
+        self.message = (self.message or "").strip()
+        if not self.message:
+            raise ValueError("message must not be blank")
+        return self
+
+
+@router.post("/api/v1/chat", tags=["chat"])
+def chat_inline(payload: ChatIn):
+    """閒聊／諮詢／日常對話（非命理推演），使用 instant 模型快速回應。"""
+    import os as _os
+    api_key = _os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 未設定")
+    try:
+        from openai import OpenAI as _OpenAI
+        from yinluren.kernel.llm_divination import _use_responses_api
+    except ImportError as _e:
+        raise HTTPException(status_code=500, detail=str(_e))
+
+    history = _sanitize_inline_history(payload.chat_history)
+    p = payload.profile or {}
+    name = ((p.get("nickname") or p.get("name") or "").strip()) or "旅人"
+    lang = (payload.language or "zh-Hant-TW").strip()
+    _lang_map = {
+        "zh-Hant": "繁體中文（台灣）", "zh-Hant-TW": "繁體中文（台灣）",
+        "zh-Hant-HK": "繁體中文（香港）", "zh-Hans": "简体中文", "en": "English",
+    }
+    lang_dir = "" if lang.lower() in ("zh-hant", "zh-hant-tw", "zh", "", "zh-tw") else f"請用{_lang_map.get(lang, lang)}回覆。"
+
+    system_prompt = (
+        f"你是《引路人 Lumora》，一位溫暖、睿智的東方智慧引路者。{lang_dir}"
+        f"用戶叫{name}。你的職責是傾聽、理解、溫暖回應日常對話、人生困惑與情感問題。"
+        "回應自然、有溫度、簡短有力（3～5 句為佳）。"
+        "若用戶明確要求占卜、算命、起卦或命理推演，請說：「若要推演，請告訴我你的問題，我會為你起卦。」"
+        "勿主動提及命理或占卜術語。"
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    for h in history:
+        messages.append({"role": h["role"], "content": h["content"]})
+    messages.append({"role": "user", "content": payload.message})
+
+    model = _os.environ.get("OPENAI_MODEL_INSTANT", "gpt-5.5-instant")
+    client = _OpenAI(api_key=api_key)
+    try:
+        if _use_responses_api(model):
+            non_sys = [m for m in messages if m["role"] != "system"]
+            resp = client.responses.create(
+                model=model, instructions=system_prompt, input=non_sys,
+                max_output_tokens=600, timeout=20.0,
+            )
+            reply = (getattr(resp, "output_text", None) or "").strip()
+        else:
+            resp = client.chat.completions.create(
+                model=model, messages=messages,
+                max_tokens=600, temperature=0.85, timeout=20.0,
+            )
+            reply = (resp.choices[0].message.content or "").strip()
+    except Exception as exc:
+        logger.exception("chat_inline failed")
+        raise HTTPException(status_code=500, detail=f"對話失敗：{exc}") from exc
+
+    return {"status": "ok", "reply": reply}
+
+
 @router.get("/api/v1/ui_strings", tags=["i18n"])
 def ui_strings(lang: str = DEFAULT_LANGUAGE):
     """整包 UI 文字 i18n：選什麼語言就回該語言的全部介面字串（繁中原文直回；其他語言 LLM 翻譯＋快取）。"""

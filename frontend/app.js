@@ -85,6 +85,45 @@
   }
 
   // ==================================================================
+  // 打字泡泡（取代全螢幕 loading，僅在聊天流中顯示三點跳動）
+  // ==================================================================
+  function showTypingBubble() {
+    const list = $("#chat-list");
+    if ($("#typing-bubble")) return;
+    const el = document.createElement("div");
+    el.className = "msg assistant typing";
+    el.id = "typing-bubble";
+    el.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    list.appendChild(el);
+    list.scrollTop = list.scrollHeight;
+  }
+
+  function removeTypingBubble() {
+    const el = $("#typing-bubble");
+    if (el) el.remove();
+  }
+
+  // ==================================================================
+  // 推演意圖偵測（有這些詞 → 走 /divine；否則走 /chat 閒聊）
+  // ==================================================================
+  const DIVINATION_KEYWORDS = [
+    "占卜","起卦","卜卦","卦象","算命","命盤","命理","批命","看命","幫我算","幫我看","幫我占",
+    "塔羅","抽牌","抽卦","抽簽","求籤","抽一","抽個","靈棋",
+    "運勢","流年","大運","小運","年運","月運","週運","今日運","今天運",
+    "八字","紫微","六爻","奇門","梅花","六壬","擇日","風水","堪輿","陰宅","祖墳",
+    "解夢","面相","掌相","看相","骨相",
+    "吉凶","宜忌","化解","開運","旺","煞","桃花","財運","貴人","官司","病","劫",
+    "何時","幾時","何年","幾歲","幾月","幾號",
+    "會怎樣","有沒有","能成功","有希望","適合嗎","能不能","行不行","好不好","該不該","可不可以",
+    "這段感情","這份工作","這個投資","這次機會","這件事","這樁","到底能不能","究竟能不能",
+    "前途","命格","格局","大限","小限","流月","流日",
+  ];
+
+  function isDivinationIntent(text) {
+    return DIVINATION_KEYWORDS.some(k => text.includes(k));
+  }
+
+  // ==================================================================
   // 場景 SVG（夜色山路 + 雙人剪影 + 古燈）
   // ==================================================================
   function renderScene() {
@@ -342,9 +381,22 @@
       const el = document.createElement("div");
       el.className = "msg " + msg.role;
       if (msg.role === "user") {
-        el.textContent = msg.content;
+        if (msg.image) {
+          const img = document.createElement("img");
+          img.src = msg.image;
+          img.className = "msg-image";
+          img.alt = "圖片";
+          el.appendChild(img);
+        }
+        if (msg.content) {
+          const textEl = document.createElement("div");
+          textEl.textContent = msg.content;
+          el.appendChild(textEl);
+        }
+        attachLongPress(el, idx);
       } else if (msg.role === "assistant") {
         el.innerHTML = renderAssistantContent(msg);
+        attachLongPress(el, idx);
       }
       list.appendChild(el);
     });
@@ -394,47 +446,79 @@
     let chat = getActiveChat();
     if (!chat) chat = newChat(question);
 
-    chat.messages.push({ role: "user", content: question });
+    // 加入用戶訊息（含圖片）
+    const userMsg = { role: "user", content: question };
+    if (_pendingImage) {
+      userMsg.image = _pendingImage.dataUrl;
+      _pendingImage = null;
+      const preview = $("#pending-image-preview");
+      if (preview) preview.remove();
+    }
+    chat.messages.push(userMsg);
     if (!chat.title || chat.title === "新對話") {
       chat.title = question.slice(0, 24);
     }
     saveState();
     show("screen-chat");
     renderChatList();
+    showTypingBubble();
 
-    // 近 6 輪歷史
-    const history = chat.messages.slice(-12, -1).map(m => ({ role: m.role, content: m.content }));
+    // 近 6 輪歷史（只傳文字，不傳圖片 dataUrl）
+    const history = chat.messages.slice(-12, -1).map(m => ({ role: m.role, content: m.content || "" }));
 
-    showLoading();
+    const useDivination = isDivinationIntent(question);
+
     try {
-      const res = await fetch(`${API_BASE}/divine`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question,
-          profile: state.profile,
-          chat_history: history,
-          language: state.lang,
-          use_thinking: false,
-        }),
-      });
-      const data = await res.json();
-      if (data.status === "ok" && data.result) {
-        chat.messages.push({
-          role: "assistant",
-          content: data.result.core_conclusion || "",
-          result: data.result,
-          meta: data._meta,
+      let data;
+      if (useDivination) {
+        const res = await fetch(`${API_BASE}/divine`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question,
+            profile: state.profile,
+            chat_history: history,
+            language: state.lang,
+            use_thinking: false,
+          }),
         });
-      } else if (data.detail) {
-        chat.messages.push({ role: "assistant", content: t("err_incomplete_prefix") + data.detail });
+        data = await res.json();
+        if (data.status === "ok" && data.result) {
+          chat.messages.push({
+            role: "assistant",
+            content: data.result.core_conclusion || "",
+            result: data.result,
+            meta: data._meta,
+          });
+        } else if (data.detail) {
+          chat.messages.push({ role: "assistant", content: t("err_incomplete_prefix") + data.detail });
+        } else {
+          chat.messages.push({ role: "assistant", content: data.error || t("err_incomplete") });
+        }
       } else {
-        chat.messages.push({ role: "assistant", content: data.error || t("err_incomplete") });
+        const res = await fetch(`${API_BASE}/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: question,
+            profile: state.profile,
+            chat_history: history,
+            language: state.lang,
+          }),
+        });
+        data = await res.json();
+        if (data.status === "ok" && data.reply) {
+          chat.messages.push({ role: "assistant", content: data.reply });
+        } else if (data.detail) {
+          chat.messages.push({ role: "assistant", content: data.detail });
+        } else {
+          chat.messages.push({ role: "assistant", content: data.error || t("err_incomplete") });
+        }
       }
     } catch (err) {
       chat.messages.push({ role: "assistant", content: t("err_connection") });
     } finally {
-      hideLoading();
+      removeTypingBubble();
       saveState();
       renderChatList();
     }
@@ -583,18 +667,227 @@
       });
     });
 
-    $("#file-input-image").addEventListener("change", async (e) => {
+    $("#file-input-image").addEventListener("change", (e) => {
       const f = e.target.files[0]; if (!f) return;
-      toast(t("toast_image_selected", { name: f.name }));
-      // TODO: POST /api/v1/vision/analyze
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        _pendingImage = { dataUrl: ev.target.result, name: f.name };
+        _showPendingImage();
+      };
+      reader.readAsDataURL(f);
       e.target.value = "";
     });
     $("#file-input-doc").addEventListener("change", async (e) => {
       const f = e.target.files[0]; if (!f) return;
       toast(t("toast_file_selected", { name: f.name }));
-      // TODO: POST /api/v1/file/analyze
       e.target.value = "";
     });
+  }
+
+  // ==================================================================
+  // 待傳圖片預覽
+  // ==================================================================
+  let _pendingImage = null;
+
+  function _showPendingImage() {
+    let preview = $("#pending-image-preview");
+    if (!preview) {
+      preview = document.createElement("div");
+      preview.id = "pending-image-preview";
+      preview.className = "pending-image-preview";
+      const img = document.createElement("img");
+      img.alt = "預覽";
+      const rmBtn = document.createElement("button");
+      rmBtn.className = "pending-image-remove";
+      rmBtn.textContent = "×";
+      rmBtn.addEventListener("click", () => {
+        _pendingImage = null;
+        preview.remove();
+      });
+      preview.appendChild(img);
+      preview.appendChild(rmBtn);
+      const chatComposer = document.querySelector("#screen-chat .composer");
+      if (chatComposer) chatComposer.parentNode.insertBefore(preview, chatComposer);
+    }
+    preview.querySelector("img").src = _pendingImage.dataUrl;
+  }
+
+  // ==================================================================
+  // 長按 / 右鍵選單
+  // ==================================================================
+  let _lpTimer = null;
+
+  function attachLongPress(el, msgIdx) {
+    // Touch 長按
+    el.addEventListener("touchstart", (e) => {
+      _lpTimer = setTimeout(() => { _lpTimer = null; showContextMenu(el, e.touches[0], msgIdx); }, 520);
+    }, { passive: true });
+    el.addEventListener("touchend", () => { clearTimeout(_lpTimer); _lpTimer = null; });
+    el.addEventListener("touchmove", () => { clearTimeout(_lpTimer); _lpTimer = null; });
+    // 桌面右鍵
+    el.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      showContextMenu(el, e, msgIdx);
+    });
+    // 雙擊 emoji 反應（桌面）
+    el.addEventListener("dblclick", () => showReactionPicker(el));
+  }
+
+  function showContextMenu(msgEl, pos, msgIdx) {
+    hideContextMenu();
+    const isUser = msgEl.classList.contains("user");
+
+    const items = isUser ? [
+      { icon: "↩", label: "回覆", fn: () => _replyTo(msgEl) },
+      { icon: "📋", label: "複製", fn: () => _copyMsg(msgEl) },
+      { icon: "✏️", label: "編輯", fn: () => _editMsg(msgIdx) },
+      { icon: "↩️", label: "收回", fn: () => _retractMsg(msgIdx) },
+      { icon: "⚠️", label: "回報問題", fn: () => toast("感謝回報！") },
+      { icon: "↗️", label: "分享", fn: () => _shareMsg(msgEl) },
+    ] : [
+      { icon: "↩", label: "回覆", fn: () => _replyTo(msgEl) },
+      { icon: "📋", label: "複製", fn: () => _copyMsg(msgEl) },
+      { icon: "⚠️", label: "回報問題", fn: () => toast("感謝回報！") },
+    ];
+
+    const menu = document.createElement("div");
+    menu.id = "context-menu";
+    menu.className = "context-menu";
+    items.forEach(item => {
+      const btn = document.createElement("button");
+      btn.className = "context-menu-item";
+      btn.innerHTML = `<span class="context-menu-icon">${item.icon}</span><span>${item.label}</span>`;
+      btn.addEventListener("click", () => { hideContextMenu(); item.fn(); });
+      menu.appendChild(btn);
+    });
+    document.body.appendChild(menu);
+
+    const rect = msgEl.getBoundingClientRect();
+    const mH = items.length * 46 + 8;
+    const top = rect.top > mH + 16 ? rect.top - mH - 8 : rect.bottom + 8;
+    const left = Math.max(8, Math.min(window.innerWidth - 196, isUser ? rect.right - 188 : rect.left));
+    menu.style.cssText = `top:${Math.min(top, window.innerHeight - mH - 8)}px;left:${left}px`;
+
+    setTimeout(() => {
+      document.addEventListener("click", hideContextMenu, { once: true });
+      document.addEventListener("touchstart", hideContextMenu, { once: true });
+    }, 30);
+  }
+
+  function hideContextMenu() {
+    const m = $("#context-menu");
+    if (m) m.remove();
+  }
+
+  function _copyMsg(el) {
+    navigator.clipboard.writeText(el.innerText || el.textContent || "").catch(() => {});
+    toast("已複製");
+  }
+
+  function _replyTo(el) {
+    const snippet = (el.innerText || el.textContent || "").slice(0, 40).replace(/\n/g, " ");
+    const ta = $(".screen.active #chat-input") || $("#chat-input");
+    if (ta) { ta.value = `回覆「${snippet}…」\n`; ta.focus(); autosizeTextarea(ta); }
+  }
+
+  function _editMsg(idx) {
+    const chat = getActiveChat(); if (!chat) return;
+    const msg = chat.messages[idx]; if (!msg || msg.role !== "user") return;
+    const ta = $("#chat-input");
+    if (ta) { ta.value = msg.content; ta.focus(); autosizeTextarea(ta); }
+    chat.messages.splice(idx);
+    saveState(); renderChatList();
+  }
+
+  function _retractMsg(idx) {
+    const chat = getActiveChat(); if (!chat) return;
+    chat.messages.splice(idx, 1);
+    saveState(); renderChatList();
+    toast("已收回");
+  }
+
+  function _shareMsg(el) {
+    const text = el.innerText || el.textContent || "";
+    if (navigator.share) {
+      navigator.share({ text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text).catch(() => {});
+      toast("已複製分享內容");
+    }
+  }
+
+  // ==================================================================
+  // Emoji 反應（雙擊 / 觸控點兩下）
+  // ==================================================================
+  const _EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🙏", "✨", "🔥"];
+  let _tapEl = null, _tapTimer = null;
+
+  function setupTapReactions() {
+    $("#chat-list").addEventListener("touchend", (e) => {
+      const msgEl = e.target.closest(".msg:not(.typing)");
+      if (!msgEl) return;
+      if (_tapEl === msgEl) {
+        clearTimeout(_tapTimer); _tapTimer = null; _tapEl = null;
+        showReactionPicker(msgEl);
+      } else {
+        _tapEl = msgEl;
+        _tapTimer = setTimeout(() => { _tapEl = null; _tapTimer = null; }, 320);
+      }
+    });
+  }
+
+  function showReactionPicker(msgEl) {
+    hideReactionPicker();
+    const picker = document.createElement("div");
+    picker.id = "reaction-picker";
+    picker.className = "reaction-picker";
+    _EMOJIS.forEach(em => {
+      const btn = document.createElement("button");
+      btn.className = "reaction-emoji-btn";
+      btn.textContent = em;
+      btn.addEventListener("click", () => { addReaction(msgEl, em); hideReactionPicker(); });
+      picker.appendChild(btn);
+    });
+    document.body.appendChild(picker);
+
+    const rect = msgEl.getBoundingClientRect();
+    const isUser = msgEl.classList.contains("user");
+    const left = Math.max(8, Math.min(window.innerWidth - 290, isUser ? rect.right - 290 : rect.left));
+    picker.style.cssText = `top:${Math.max(8, rect.top - 58)}px;left:${left}px`;
+
+    setTimeout(() => {
+      document.addEventListener("click", hideReactionPicker, { once: true });
+      document.addEventListener("touchstart", hideReactionPicker, { once: true });
+    }, 30);
+  }
+
+  function hideReactionPicker() {
+    const p = $("#reaction-picker");
+    if (p) p.remove();
+  }
+
+  function addReaction(msgEl, emoji) {
+    let bar = msgEl.querySelector(".reaction-bar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "reaction-bar";
+      msgEl.appendChild(bar);
+    }
+    const existing = [...bar.querySelectorAll(".reaction-chip")].find(c => c.dataset.emoji === emoji);
+    if (existing) {
+      const n = parseInt(existing.querySelector(".reaction-count").textContent) + 1;
+      existing.querySelector(".reaction-count").textContent = n;
+    } else {
+      const chip = document.createElement("button");
+      chip.className = "reaction-chip reacted";
+      chip.dataset.emoji = emoji;
+      chip.innerHTML = `${emoji}<span class="reaction-count">1</span>`;
+      chip.addEventListener("click", () => {
+        const n = parseInt(chip.querySelector(".reaction-count").textContent) + 1;
+        chip.querySelector(".reaction-count").textContent = n;
+      });
+      bar.appendChild(chip);
+    }
   }
 
   // ==================================================================
@@ -609,8 +902,9 @@
     const ta = $("#" + textareaId);
     const btn = $("#" + sendBtnId);
     ta.addEventListener("input", () => autosizeTextarea(ta));
+    // Shift+Enter 送出；單獨 Enter 換行（移動端友善）
     ta.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      if (e.key === "Enter" && e.shiftKey && !e.isComposing) {
         e.preventDefault();
         doSend();
       }
@@ -619,7 +913,7 @@
 
     function doSend() {
       const text = ta.value.trim();
-      if (!text) return;
+      if (!text && !_pendingImage) return;
       ta.value = ""; autosizeTextarea(ta);
       sendQuestion(text);
     }
@@ -636,6 +930,7 @@
     setupAttach();
     setupComposer("home-input", "btn-send-home");
     setupComposer("chat-input", "btn-send-chat");
+    setupTapReactions();
 
     // 語言
     $$(".lang-btn").forEach(b => {
