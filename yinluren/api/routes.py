@@ -589,6 +589,7 @@ class DivineInlineIn(BaseModel):
     chat_history: Optional[list[Dict[str, Any]]] = None
     language: Optional[str] = None
     use_thinking: bool = False
+    image_b64: Optional[str] = None  # base64 圖片（不含 data: prefix）
 
     @model_validator(mode="after")
     def _strip_question(self):
@@ -674,6 +675,7 @@ def divine_inline(payload: DivineInlineIn):
             clarification_answers={},
             conversation_history=history,
             deep_reasoning=bool(payload.use_thinking),
+            image_b64=payload.image_b64 or None,
         )
     except Exception as exc:  # 一律回 500 + 訊息，前端會顯示「推演暫時無法完成」
         logger.exception("inline divine failed")
@@ -764,6 +766,42 @@ def chat_inline(payload: ChatIn):
         raise HTTPException(status_code=500, detail=f"對話失敗：{exc}") from exc
 
     return {"status": "ok", "reply": reply}
+
+
+class VisionIn(BaseModel):
+    image_b64: str = Field(..., min_length=10)
+    question: Optional[str] = None
+    language: Optional[str] = None
+
+
+@router.post("/api/v1/vision/analyze", tags=["vision"])
+def vision_analyze(payload: VisionIn):
+    """圖片 Vision 分析：面相 / 手相 / 場景 / 文字，回傳描述供前端顯示或進一步推演。"""
+    import os as _os
+    api_key = _os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY 未設定")
+    try:
+        from openai import OpenAI as _OpenAI
+        client = _OpenAI(api_key=api_key)
+        user_prompt = payload.question or "請描述這張圖片，包含臉相、手相、場景、文字等任何可見內容，以中文輸出，供命理推演參考。"
+        resp = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{payload.image_b64}"}},
+                ],
+            }],
+            max_tokens=500,
+            timeout=20.0,
+        )
+        description = (resp.choices[0].message.content or "").strip()
+    except Exception as exc:
+        logger.exception("vision_analyze failed")
+        raise HTTPException(status_code=500, detail=f"圖片分析失敗：{exc}") from exc
+    return {"status": "ok", "description": description}
 
 
 @router.get("/api/v1/ui_strings", tags=["i18n"])

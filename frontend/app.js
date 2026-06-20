@@ -448,8 +448,11 @@
 
     // 加入用戶訊息（含圖片）
     const userMsg = { role: "user", content: question };
+    let _imageB64 = null;
     if (_pendingImage) {
       userMsg.image = _pendingImage.dataUrl;
+      // 擷取純 base64（去掉 data:image/...;base64, 前綴）
+      _imageB64 = _pendingImage.dataUrl.split(",")[1] || null;
       _pendingImage = null;
       const preview = $("#pending-image-preview");
       if (preview) preview.remove();
@@ -471,6 +474,21 @@
     try {
       let data;
       if (useDivination) {
+        // 有圖片時先跑 vision 分析並顯示描述
+        let visionDesc = "";
+        if (_imageB64) {
+          try {
+            const vRes = await fetch(`${API_BASE}/vision/analyze`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image_b64: _imageB64, question, language: state.lang }),
+            });
+            const vData = await vRes.json();
+            if (vData.status === "ok" && vData.description) {
+              visionDesc = vData.description;
+            }
+          } catch (_) {}
+        }
         const res = await fetch(`${API_BASE}/divine`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -480,6 +498,7 @@
             chat_history: history,
             language: state.lang,
             use_thinking: false,
+            image_b64: _imageB64 || undefined,
           }),
         });
         data = await res.json();

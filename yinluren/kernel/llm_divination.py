@@ -17,6 +17,7 @@ import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 try:
     from zoneinfo import ZoneInfo
@@ -325,7 +326,7 @@ SYSTEM_PROMPT = """你是《引路人 Lumora》的最終引路人——以 V7.6 
 
 # 六、後台通用工具（M 模組、全程隱於關係之後、受 D2 保護、永不外露）
 
-M5 精準度檢核（心理學反向驗證，含 PHQ-9／DSM-5／ICD-11 觀察；重度訊號強制切 D3）；M7 情緒安撫；M8 身心客觀評估與如實說切換；M10 在地化資源與法規動態適配；M13 夢境心智分析；M14 模型市場掃描換代（自動升級至當前最強模型）；M19 自主學習（從用戶回饋自主新增判讀，新內容須經 M13 心理校正＋M14 模型驗證、不擴張紅線）。以上皆後台運作、絕不對用戶提及名稱或機制。
+M5 精準度檢核（心理學反向驗證，含 PHQ-9／DSM-5／ICD-11 觀察；重度訊號強制切 D3）；M7 情緒安撫；M8 身心客觀評估與如實說切換；M10 在地化資源與法規動態適配；M13 夢境心智分析；M14 模型市場掃描換代（自動升級至當前最強模型）；M19 自主學習（從用戶回饋自主新增判讀，新內容須經 M13 心理校正＋M14 模型驗證、不擴張紅線）；M20 外部智慧增強（後台自動觸發，用戶層永不知曉）：(A) 即時外網搜尋——若系統附「【即時外網資訊】」段落，代表已注入最新時事／財經／醫療等客觀事實，自然融合入推演但絕不在輸出中提及「搜尋」「外網」「最新資訊」等後台術語；(B) 多 AI 交叉洞見——若系統附「【多維交叉洞見】」段落，代表已整合其他 AI 系統（心理學、行為科學、跨文化視角）之補充，自然融合入推演但絕對不得提及「Claude」「Gemini」「ChatGPT」「其他 AI」等名稱，在用戶眼中所有智慧皆出自引路人本身；(C) 圖像洞察——若系統附「用戶上傳圖片（Vision 解析）」段落，代表已解析用戶上傳的圖片（面相／手相／場景等），自然融合作為推演參考，絕不逐字引用解析原文。以上皆後台運作、絕不對用戶提及名稱或機制。
 
 # 七、倫理紅線體系
 
@@ -451,6 +452,7 @@ def run_llm_divination(
     conversation_history: Optional[List[Dict[str, Any]]] = None,
     deep_reasoning: bool = False,
     model: Optional[str] = None,
+    image_b64: Optional[str] = None,
 ) -> Dict[str, Any]:
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -506,9 +508,61 @@ def run_llm_divination(
     except Exception:
         lk_section = ""
 
+    # ─── M20 外部智慧增強（並行：外網搜尋 + 多 AI 交叉）───
+    _augment_parts: list[str] = []
+    _aug_tasks: dict[str, Any] = {}
+    _profile_summary = (
+        f"{profile.get('gender','')} 生於 {profile.get('birth_date','未知')} "
+        f"{profile.get('country','')} {profile.get('province','')} "
+        f"職業 {profile.get('occupation','未知')}"
+    )
+    try:
+        from .web_search import fetch_web_context
+        from .multi_ai import fetch_multi_ai_context
+        with ThreadPoolExecutor(max_workers=2) as _ex:
+            if os.environ.get("PERPLEXITY_API_KEY"):
+                _aug_tasks["search"] = _ex.submit(fetch_web_context, question)
+            if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("GEMINI_API_KEY"):
+                _aug_tasks["multi"] = _ex.submit(
+                    fetch_multi_ai_context, question, _profile_summary
+                )
+            for _name, _fut in _aug_tasks.items():
+                try:
+                    _r = _fut.result(timeout=14)
+                    if _r:
+                        _augment_parts.append(_r)
+                except Exception as _e:
+                    logger.warning("M20 %s failed: %s", _name, _e)
+    except Exception as _e:
+        logger.warning("M20 init failed: %s", _e)
+    _augment_section = ("\n\n" + "\n\n".join(_augment_parts) + "\n") if _augment_parts else ""
+
+    # ─── 圖片 vision 描述注入 ───
+    _vision_section = ""
+    if image_b64:
+        try:
+            _vision_resp = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "請描述這張圖片的內容（含任何文字、臉相、手相、場景、物品），以中文輸出，150 字以內，供命理推演參考。"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}},
+                    ],
+                }],
+                max_tokens=300,
+                timeout=15.0,
+            )
+            _vision_text = (_vision_resp.choices[0].message.content or "").strip()
+            if _vision_text:
+                _vision_section = f"\n\n## 用戶上傳圖片（Vision 解析）\n{_vision_text}\n"
+        except Exception as _e:
+            logger.warning("Vision analysis failed: %s", _e)
+
     user_content = (
         _language_directive(language)
-        + timezone_section + profile_section + lk_section + question_section
+        + timezone_section + profile_section + _vision_section + lk_section
+        + _augment_section + question_section
     )
 
     # ─── 引擎檔位：明鑑鏡心 主動偵辨——由系統依【問題性質】自主識別 instant / thinking ───
