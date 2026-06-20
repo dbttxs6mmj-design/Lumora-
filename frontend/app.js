@@ -285,16 +285,50 @@
       minSel.appendChild(opt);
     });
 
-    // 國家
+    // 國家 + 搜尋
     const countrySel = $("#ob-country");
-    LUMORA_DATA.countries.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = c.code;
-      opt.textContent = c.name;
-      countrySel.appendChild(opt);
-    });
+    const countrySearch = $("#ob-country-search");
+    const provSel = $("#ob-province");
+    const provSearch = $("#ob-province-search");
+
+    function _populateCountry() {
+      countrySel.innerHTML = '<option value="">' + t("please_select") + '</option>';
+      const q = countrySearch.value.toLowerCase();
+      LUMORA_DATA.countries.forEach(c => {
+        if (!q || c.name.includes(q) || c.code.toLowerCase().includes(q)) {
+          const opt = document.createElement("option");
+          opt.value = c.code;
+          opt.textContent = c.name;
+          countrySel.appendChild(opt);
+        }
+      });
+    }
+    _populateCountry();
+    countrySearch.addEventListener("input", _populateCountry);
+
+    function _populateProvince() {
+      const q = provSearch.value.toLowerCase();
+      const c = LUMORA_DATA.countries.find(x => x.code === countrySel.value);
+      if (!c) return;
+      const prev = provSel.value;
+      provSel.innerHTML = '<option value="">' + t("please_select") + '</option>';
+      c.provinces.forEach(p => {
+        if (!q || p.name.toLowerCase().includes(q)) {
+          const opt = document.createElement("option");
+          opt.value = JSON.stringify(p);
+          opt.textContent = p.name;
+          provSel.appendChild(opt);
+        }
+      });
+      if (prev) {
+        const match = Array.from(provSel.options).find(o => o.value === prev);
+        if (match) provSel.value = prev;
+      }
+    }
+
     countrySel.addEventListener("change", () => {
-      const provSel = $("#ob-province");
+      provSearch.value = "";
+      provSearch.disabled = !countrySel.value;
       provSel.innerHTML = '<option value="">' + t("please_select") + '</option>';
       const c = LUMORA_DATA.countries.find(x => x.code === countrySel.value);
       if (c) {
@@ -306,6 +340,7 @@
         });
       }
     });
+    provSearch.addEventListener("input", _populateProvince);
 
     // 職業
     const occSel = $("#ob-occupation");
@@ -316,13 +351,27 @@
       occSel.appendChild(opt);
     });
 
-    // 性別 seg
+    // seg-radio（支援多組：性別、時辰模式）
     $$(".seg-radio .seg").forEach(btn => {
       btn.addEventListener("click", () => {
-        $$(".seg-radio .seg").forEach(b => b.classList.remove("active"));
+        btn.closest(".seg-radio").querySelectorAll(".seg").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
+        // 時辰模式切換
+        if (btn.dataset.timeMode) _onTimeModeChange(btn.dataset.timeMode);
       });
     });
+
+    // 時辰模式顯示控制
+    function _onTimeModeChange(mode) {
+      const exactWrap = $("#ob-exact-time-wrap");
+      const shichenWrap = $("#ob-shichen-wrap");
+      const unknownHint = $("#ob-unknown-time-hint");
+      exactWrap.style.display = mode === "exact" ? "" : "none";
+      shichenWrap.style.display = mode === "shichen" ? "" : "none";
+      unknownHint.style.display = mode === "unknown" ? "" : "none";
+    }
+    // 預設精確模式：隱藏其他
+    _onTimeModeChange("exact");
 
     // 下一步
     $$(".next-btn").forEach(btn => {
@@ -364,7 +413,7 @@
 
   function finishOnboarding() {
     if (!validateStep(1)) { goStep(1); return; }
-    const sexBtn = $$(".seg-radio .seg.active")[0];
+    const sexBtn = $(".seg-radio .seg.active[data-sex]");
     const provRaw = $("#ob-province").value;
     let prov = null, lng = null;
     if (provRaw) {
@@ -372,13 +421,34 @@
     }
     const country = LUMORA_DATA.countries.find(c => c.code === $("#ob-country").value);
 
+    // 出生時辰解析
+    const timeMode = ($("#ob-time-mode-group .seg.active") || {}).dataset?.timeMode || "exact";
+    let birth_hour = null, birth_minute = null, birth_shichen = null, birth_time_unknown = false;
+    if (timeMode === "exact") {
+      birth_hour = $("#ob-birth-hour").value !== "" ? parseInt($("#ob-birth-hour").value, 10) : null;
+      birth_minute = $("#ob-birth-minute").value !== "" ? parseInt($("#ob-birth-minute").value, 10) : null;
+    } else if (timeMode === "shichen") {
+      const shichenEl = $("#ob-birth-shichen");
+      birth_shichen = shichenEl.value || null;
+      const sel = shichenEl.selectedOptions[0];
+      if (sel && sel.dataset.hour !== undefined) {
+        birth_hour = parseInt(sel.dataset.hour, 10);
+        birth_minute = 0;
+      }
+    } else {
+      birth_time_unknown = true;
+    }
+
     state.profile = {
       name: $("#ob-name").value.trim(),
       nickname: $("#ob-nickname").value.trim() || null,
       sex: sexBtn ? sexBtn.dataset.sex : "M",
       birth_date: $("#ob-birth-date").value || null,
-      birth_hour: $("#ob-birth-hour").value ? parseInt($("#ob-birth-hour").value, 10) : null,
-      birth_minute: $("#ob-birth-minute").value ? parseInt($("#ob-birth-minute").value, 10) : null,
+      birth_hour,
+      birth_minute,
+      birth_shichen: birth_shichen || null,
+      birth_time_unknown,
+      birth_time_mode: timeMode,
       country: country ? country.name : null,
       province: prov ? prov.name : null,
       birth_longitude: lng,

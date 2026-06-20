@@ -475,14 +475,41 @@ def run_llm_divination(
     timezone_section = _build_timezone_section(calibration)
 
     # ─── 命盤段 ───
+    _name = profile.get('name') or profile.get('label') or '—'
+    _nickname = profile.get('nickname') or ''
+    _sex_raw = profile.get('sex') or profile.get('gender') or '—'
+    _sex = {'M': '男', 'F': '女', '男': '男', '女': '女'}.get(_sex_raw, _sex_raw)
+    _birth_hour = profile.get('birth_hour')
+    _birth_minute = profile.get('birth_minute')
+    _birth_shichen = profile.get('birth_shichen')
+    _birth_time_unknown = profile.get('birth_time_unknown', False)
+    if _birth_time_unknown:
+        _time_str = "【用戶不清楚】⚠️ 請啟動《明鍵鏡心》出生時辰反推機制，根據問題語境、性格特徵與人生軌跡推算最可能的時辰，再進行命盤推演"
+    elif _birth_shichen:
+        _mid = f"{_birth_hour:02d}:00" if _birth_hour is not None else "—"
+        _time_str = f"{_birth_shichen}（用戶選擇時辰，取中點 {_mid} 推算）"
+    elif _birth_hour is not None:
+        _min = _birth_minute if _birth_minute is not None else 0
+        _time_str = f"{_birth_hour:02d}:{_min:02d}"
+    else:
+        _time_str = profile.get('birth_time_slot') or '—'
+    _prov = profile.get('province') or ''
+    _country = profile.get('country') or ''
+    _location = (profile.get('birth_location')
+                 or (_country + (' · ' + _prov if _prov else ''))
+                 or profile.get('city') or '—')
+    _occ = profile.get('occupation_category') or profile.get('occupation') or '—'
+    _occ_kw = profile.get('occupation_keyword') or ''
+    _name_str = _name + ('（' + _nickname + '）' if _nickname else '')
+    _occ_str = _occ + (' — ' + _occ_kw if _occ_kw else '')
     profile_section = f"""
 ## 用戶命盤資料
-- 名號：{profile.get('label', '—')}
-- 性別：{profile.get('gender', '—')}
+- 名號：{_name_str}
+- 性別：{_sex}
 - 出生日期：{profile.get('birth_date', '—')}
-- 出生時辰（用戶原始填寫）：{profile.get('birth_time_slot', '—')}
-- 出生地：{profile.get('country', '')} {profile.get('province', '')} {profile.get('city', '')}
-- 職業：{profile.get('occupation', '—')}
+- 出生時辰：{_time_str}
+- 出生地：{_location}
+- 職業：{_occ_str}
 """
 
     question_section = f"""

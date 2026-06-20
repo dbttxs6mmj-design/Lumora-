@@ -331,6 +331,10 @@ input, textarea, select { font-family: inherit; color: inherit; }
 
 .field input::placeholder { color: var(--c-paper-faint); }
 
+/* 出生地搜尋輸入框 */
+#ob-country-search, #ob-province-search { margin-bottom: 8px; }
+#ob-province-search:disabled { opacity: 0.4; }
+
 .field input:focus, .field select:focus {
   border-color: var(--c-lamp-bright);
   box-shadow: 0 0 0 3px rgba(192,106,43,0.15);
