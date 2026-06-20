@@ -580,6 +580,7 @@ _INLINE_EMPTY_RESULT = {
     "research_summary": "",
     "risk_focus": [],
     "timing_window": "",
+    "engines_cited": [],
 }
 
 
