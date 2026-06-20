@@ -1,0 +1,21 @@
+[Unit]
+Description=引路人 Lumora — FastAPI Backend
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# ── 請依實際情況修改以下兩行 ──
+User=root
+WorkingDirectory=/root/Lumora-vps
+# ─────────────────────────────
+EnvironmentFile=/root/Lumora-vps/.env
+ExecStart=/usr/local/bin/uvicorn yinluren.main:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lumora
+
+[Install]
+WantedBy=multi-user.target
