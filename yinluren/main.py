@@ -6,7 +6,7 @@ import time
 import threading
 from collections import defaultdict
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse as _JSONResponse
 
@@ -79,10 +79,7 @@ def rate_limit(request: Request, limit: int = 30, window_sec: int = 60):
     path = request.url.path
     key = f"{ip}:{path}"
     if not _check_rate(key, limit, window_sec):
-        raise _JSONResponse(  # type: ignore[misc]
-            content={"detail": "請求過於頻繁，請稍後再試。"},
-            status_code=429,
-        )
+        raise HTTPException(status_code=429, detail="請求過於頻繁，請稍後再試。")
 
 # ─── 路由 ───
 app.include_router(router)
