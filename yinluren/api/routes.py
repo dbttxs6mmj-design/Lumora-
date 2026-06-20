@@ -607,7 +607,12 @@ def _ui_profile_to_backend(p: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
     birth_hour = p.get("birth_hour")
     birth_minute = p.get("birth_minute")
-    if birth_hour in (None, ""):
+    birth_time_unknown = bool(p.get("birth_time_unknown"))
+    birth_shichen = str(p.get("birth_shichen") or "").strip() or None
+
+    if birth_time_unknown:
+        birth_time_slot = UNCERTAIN_TIME
+    elif birth_hour in (None, ""):
         birth_time_slot = UNCERTAIN_TIME
     else:
         try:
@@ -628,6 +633,10 @@ def _ui_profile_to_backend(p: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "gender": gender,
         "birth_date": str(p.get("birth_date") or "").strip(),
         "birth_time_slot": birth_time_slot,
+        "birth_hour": birth_hour,
+        "birth_minute": birth_minute,
+        "birth_shichen": birth_shichen,
+        "birth_time_unknown": birth_time_unknown,
         "branch": "不確定",
         "zodiac": "不確定",
         "country": str(p.get("country") or "").strip() or "未設定",
