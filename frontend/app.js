@@ -20,10 +20,13 @@
   // i18n 捷徑：t("key") / t("key", {name:"…"})；i18n.js 未載入時回 key 本身
   const t = (k, vars) => (window.LUMORA_I18N ? window.LUMORA_I18N.t(k, vars) : k);
 
-  // 401 → nginx Basic Auth 憑證過期：navigate 到根目錄重新觸發登入框
-  function _reAuthIfNeeded(res) {
-    if (res.status === 401) { location.replace(location.origin + "/"); return true; }
-    return false;
+  // Basic Auth 過期攔截：nginx 回 401 時跳回根目錄觸發瀏覽器重新跳登入框
+  function _authGuard(res) {
+    if (res && res.status === 401) {
+      location.replace(location.origin + "/");
+      throw new Error("auth_expired");
+    }
+    return res;
   }
 
   // ==================================================================
@@ -598,21 +601,19 @@
         let visionDesc = "";
         if (_imageB64) {
           try {
-            const vRes = await fetch(`${API_BASE}/vision/analyze`, {
+            const vRes = _authGuard(await fetch(`${API_BASE}/vision/analyze`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
               body: JSON.stringify({ image_b64: _imageB64, question, language: state.lang }),
-            });
-            if (!_reAuthIfNeeded(vRes)) {
-              const vData = await vRes.json();
-              if (vData.status === "ok" && vData.description) {
-                visionDesc = vData.description;
-              }
+            }));
+            const vData = await vRes.json();
+            if (vData.status === "ok" && vData.description) {
+              visionDesc = vData.description;
             }
           } catch (_) {}
         }
-        const res = await fetch(`${API_BASE}/divine`, {
+        const res = _authGuard(await fetch(`${API_BASE}/divine`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -624,8 +625,7 @@
             use_thinking: false,
             image_b64: _imageB64 || undefined,
           }),
-        });
-        if (_reAuthIfNeeded(res)) return;
+        }));
         data = await res.json();
         if (data.status === "ok" && data.result) {
           chat.messages.push({
@@ -640,7 +640,7 @@
           chat.messages.push({ role: "assistant", content: data.error || t("err_incomplete") });
         }
       } else {
-        const res = await fetch(`${API_BASE}/chat`, {
+        const res = _authGuard(await fetch(`${API_BASE}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -650,8 +650,7 @@
             chat_history: history,
             language: state.lang,
           }),
-        });
-        if (_reAuthIfNeeded(res)) return;
+        }));
         data = await res.json();
         if (data.status === "ok" && data.reply) {
           chat.messages.push({ role: "assistant", content: data.reply });
@@ -662,7 +661,9 @@
         }
       }
     } catch (err) {
-      chat.messages.push({ role: "assistant", content: t("err_connection") });
+      if (err.message !== "auth_expired") {
+        chat.messages.push({ role: "assistant", content: t("err_connection") });
+      }
     } finally {
       removeTypingBubble();
       saveState();
@@ -774,8 +775,7 @@
   // ==================================================================
   async function loadEnginesInfo() {
     try {
-      const res = await fetch(`${API_BASE}/engines`, { credentials: "include" });
-      if (_reAuthIfNeeded(res)) return;
+      const res = _authGuard(await fetch(`${API_BASE}/engines`, { credentials: "include" }));
       const data = await res.json();
       state.enginesMeta = data;
       // 寫進關於頁
