@@ -613,17 +613,20 @@
             }
           } catch (_) {}
         }
+        // vision 描述注入 question；/divine 不帶 image_b64（避免 nginx 413）
+        const divineQuestion = visionDesc
+          ? `${question}\n\n【用戶上傳圖片（Vision 解析）】\n${visionDesc}`
+          : question;
         const res = _authGuard(await fetch(`${API_BASE}/divine`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            question,
+            question: divineQuestion,
             profile: state.profile,
             chat_history: history,
             language: state.lang,
             use_thinking: false,
-            image_b64: _imageB64 || undefined,
           }),
         }));
         data = await res.json();
