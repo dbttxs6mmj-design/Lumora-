@@ -1,0 +1,30 @@
+# Secrets / local config
+.env
+.env.*
+*.key
+*.pem
+secrets*
+
+# Local databases (contain live user data)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node / frontend build artifacts
+node_modules/
+dist/
+build/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

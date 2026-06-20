@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1530">
+<title>引路人Lumora</title>
+<link rel="stylesheet" href="./styles.css?v=3">
+</head>
+<body>
+
+<!-- ============================== -->
+<!-- 1. 語言選擇 -->
+<!-- ============================== -->
+<section id="screen-lang" class="screen screen-bg active">
+  <div class="lang-stack">
+    <div class="lang-brand"><span data-i18n="guide">引路人</span><span class="brand-en">Lumora</span></div>
+    <div class="lang-slogan" data-i18n="slogan">指路與守心的那盞燈</div>
+    <div class="lang-options">
+      <button class="lang-btn" data-lang="zh-Hant">繁體中文</button>
+      <button class="lang-btn" data-lang="zh-Hans">简体中文</button>
+      <button class="lang-btn" data-lang="yue">粵語</button>
+      <button class="lang-btn" data-lang="en">English<span class="lang-zh">英語</span></button>
+      <button class="lang-btn" data-lang="ja">日本語<span class="lang-zh">日語</span></button>
+      <button class="lang-btn" data-lang="ko">한국어<span class="lang-zh">韓語</span></button>
+      <button class="lang-btn" data-lang="es">Español<span class="lang-zh">西班牙語</span></button>
+      <button class="lang-btn" data-lang="fr">Français<span class="lang-zh">法語</span></button>
+      <button class="lang-btn" data-lang="pt">Português<span class="lang-zh">葡萄牙語</span></button>
+      <button class="lang-btn" data-lang="nl">Nederlands<span class="lang-zh">荷蘭語</span></button>
+      <button class="lang-btn" data-lang="ru">Русский<span class="lang-zh">俄語</span></button>
+      <button class="lang-btn" data-lang="tr">Türkçe<span class="lang-zh">土耳其語</span></button>
+      <button class="lang-btn" data-lang="ar">العربية<span class="lang-zh">阿拉伯語</span></button>
+      <button class="lang-btn" data-lang="fa">فارسی<span class="lang-zh">波斯語</span></button>
+      <button class="lang-btn" data-lang="hi">हिन्दी<span class="lang-zh">印地語</span></button>
+      <button class="lang-btn" data-lang="ur">اردو<span class="lang-zh">烏爾都語</span></button>
+      <button class="lang-btn" data-lang="bn">বাংলা<span class="lang-zh">孟加拉語</span></button>
+      <button class="lang-btn" data-lang="ta">தமிழ்<span class="lang-zh">泰米爾語</span></button>
+      <button class="lang-btn" data-lang="th">ไทย<span class="lang-zh">泰語</span></button>
+      <button class="lang-btn" data-lang="vi">Tiếng Việt<span class="lang-zh">越南語</span></button>
+      <button class="lang-btn" data-lang="ms">Bahasa Melayu / Indonesia<span class="lang-zh">馬來語／印尼語</span></button>
+      <button class="lang-btn" data-lang="sw">Kiswahili<span class="lang-zh">斯瓦希里語</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== -->
+<!-- 2. 開場：夜色山路 + 雙人剪影 + 古燈 -->
+<!-- ============================== -->
+<section id="screen-intro" class="screen screen-bg">
+  <div id="scene-container"></div>
+  <div class="intro-overlay">
+    <div class="intro-brand"><span data-i18n="guide">引路人</span><span class="brand-en">Lumora</span></div>
+    <div class="intro-slogan" data-i18n="slogan">指路與守心的那盞燈</div>
+    <button id="btn-start-journey" class="primary-btn" data-i18n="start_journey">開始旅程</button>
+  </div>
+</section>
+
+<!-- ============================== -->
+<!-- 3. Onboarding 五步 -->
+<!-- ============================== -->
+<section id="screen-onboarding" class="screen screen-bg">
+  <div class="ob-container">
+    <div class="ob-progress">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+
+    <!-- Step 1 姓名 / 稱呼 / 性別 -->
+    <div class="ob-step active" data-step="1">
+      <h2 class="ob-title" data-i18n="ob1_title">先彼此認識</h2>
+      <div class="field">
+        <label><span data-i18n="name">姓名</span> <span class="req">*</span></label>
+        <input id="ob-name" type="text" data-i18n-ph="name_ph" placeholder="請輸入您的姓名" maxlength="50">
+        <div class="hint" data-i18n="name_hint">※ 將用於《姓名學》子引擎為您算命之用，不會被分享給任何第三方。</div>
+      </div>
+      <div class="field">
+        <label data-i18n="nickname">稱呼（可略）</label>
+        <input id="ob-nickname" type="text" data-i18n-ph="nickname_ph" placeholder="您希望引路人怎麼稱呼您" maxlength="30">
+      </div>
+      <div class="field">
+        <label><span data-i18n="gender">性別</span> <span class="req">*</span></label>
+        <div class="seg-radio">
+          <button class="seg" data-sex="M" data-i18n="male">男</button>
+          <button class="seg" data-sex="F" data-i18n="female">女</button>
+        </div>
+      </div>
+      <button class="primary-btn next-btn" data-next="2" data-i18n="next">下一步</button>
+    </div>
+
+    <!-- Step 2 出生年月日 -->
+    <div class="ob-step" data-step="2">
+      <h2 class="ob-title" data-i18n="ob2_title">您的生辰</h2>
+      <div class="field">
+        <label data-i18n="birth_date">出生日期</label>
+        <input id="ob-birth-date" type="date">
+        <div class="hint" data-i18n="birth_date_hint">不確定可先跳過，未來可在設定補上。</div>
+      </div>
+      <div class="ob-nav">
+        <button class="ghost-btn back-btn" data-back="1" data-i18n="prev">上一步</button>
+        <button class="primary-btn next-btn" data-next="3" data-i18n="next">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 3 出生時辰 -->
+    <div class="ob-step" data-step="3">
+      <h2 class="ob-title" data-i18n="ob3_title">出生時辰</h2>
+      <div class="field">
+        <label data-i18n="birth_time_label">時間（民用時，後端會自動校正真太陽時）</label>
+        <div class="row">
+          <select id="ob-birth-hour">
+            <option value="" data-i18n="hour">小時</option>
+          </select>
+          <select id="ob-birth-minute">
+            <option value="" data-i18n="minute">分</option>
+          </select>
+        </div>
+        <div class="hint" data-i18n="birth_time_hint">時辰未知亦可，但有時辰才能完整啟動八字、紫微。</div>
+      </div>
+      <div class="ob-nav">
+        <button class="ghost-btn back-btn" data-back="2" data-i18n="prev">上一步</button>
+        <button class="primary-btn next-btn" data-next="4" data-i18n="next">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 4 出生地 -->
+    <div class="ob-step" data-step="4">
+      <h2 class="ob-title" data-i18n="ob4_title">出生地點</h2>
+      <div class="field">
+        <label data-i18n="country">國家</label>
+        <select id="ob-country"><option value="" data-i18n="please_select">請選擇</option></select>
+      </div>
+      <div class="field">
+        <label data-i18n="region">地區 / 省 / 城市</label>
+        <select id="ob-province"><option value="" data-i18n="select_country_first">請先選國家</option></select>
+      </div>
+      <div class="hint" data-i18n="birthplace_hint">用於真太陽時的經度校正。</div>
+      <div class="ob-nav">
+        <button class="ghost-btn back-btn" data-back="3" data-i18n="prev">上一步</button>
+        <button class="primary-btn next-btn" data-next="5" data-i18n="next">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 5 職業 -->
+    <div class="ob-step" data-step="5">
+      <h2 class="ob-title" data-i18n="ob5_title">您目前的角色</h2>
+      <div class="field">
+        <label data-i18n="occupation">職業大類</label>
+        <select id="ob-occupation"><option value="" data-i18n="please_select">請選擇</option></select>
+      </div>
+      <div class="field">
+        <label data-i18n="occupation_detail">細項（可略）</label>
+        <input id="ob-occupation-detail" type="text" data-i18n-ph="occupation_ph" placeholder="例如：軟體後端工程師" maxlength="50">
+      </div>
+      <div class="hint" data-i18n="occupation_hint">引路人會用此資訊客製化推演視角。</div>
+      <div class="ob-nav">
+        <button class="ghost-btn back-btn" data-back="4" data-i18n="prev">上一步</button>
+        <button class="primary-btn" id="btn-finish-onboarding" data-i18n="enter">進入引路人</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================== -->
+<!-- 4. 首頁：完全空白輸入框 + 漢堡 -->
+<!-- ============================== -->
+<section id="screen-home" class="screen screen-bg">
+  <header class="app-header">
+    <button id="btn-menu" class="icon-btn" data-i18n-aria="aria_menu" aria-label="選單">
+      <svg viewBox="0 0 24 24" width="24" height="24"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
+    <div class="app-title"><span data-i18n="guide">引路人</span><span class="brand-en">Lumora</span></div>
+    <button id="btn-new-chat" class="icon-btn" data-i18n-aria="aria_new" aria-label="新對話">
+      <svg viewBox="0 0 24 24" width="24" height="24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </header>
+
+  <div class="home-center">
+    <div class="home-lamp" aria-hidden="true"></div>
+    <div class="home-hint" data-i18n="home_hint">把任何事都問引路人</div>
+  </div>
+
+  <footer class="composer">
+    <button id="btn-plus-home" class="composer-plus" data-i18n-aria="aria_attach" aria-label="附加">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <textarea id="home-input" data-i18n-ph="composer_ph" placeholder="請問引路人……" rows="1"></textarea>
+    <button id="btn-send-home" class="composer-send" data-i18n-aria="aria_send" aria-label="送出">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12l14-7-7 14-2-5-5-2z"/></svg>
+    </button>
+  </footer>
+</section>
+
+<!-- ============================== -->
+<!-- 5. 聊天頁 -->
+<!-- ============================== -->
+<section id="screen-chat" class="screen screen-bg">
+  <header class="app-header">
+    <button id="btn-back-chat" class="icon-btn" data-i18n-aria="aria_back" aria-label="返回">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="chat-title" id="chat-title" data-i18n="guide">引路人</div>
+    <button id="btn-menu-chat" class="icon-btn" data-i18n-aria="aria_menu" aria-label="選單">
+      <svg viewBox="0 0 24 24" width="22" height="22"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    </button>
+  </header>
+
+  <div id="chat-list" class="chat-list"></div>
+
+  <footer class="composer">
+    <button id="btn-plus-chat" class="composer-plus" data-i18n-aria="aria_attach" aria-label="附加">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <textarea id="chat-input" data-i18n-ph="composer_ph" placeholder="請問引路人……" rows="1"></textarea>
+    <button id="btn-send-chat" class="composer-send" data-i18n-aria="aria_send" aria-label="送出">
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 12l14-7-7 14-2-5-5-2z"/></svg>
+    </button>
+  </footer>
+</section>
+
+<!-- ============================== -->
+<!-- 抽屜：歷史對話 / 設定 -->
+<!-- ============================== -->
+<aside id="drawer" class="drawer">
+  <div class="drawer-mask"></div>
+  <div class="drawer-panel">
+    <div class="drawer-head">
+      <div class="drawer-title"><span data-i18n="guide">引路人</span><span class="brand-en">Lumora</span></div>
+      <button id="btn-close-drawer" class="icon-btn">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-label" data-i18n="history">對話歷史</div>
+      <div id="chat-history" class="drawer-list"></div>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-label" data-i18n="other">其他</div>
+      <button class="drawer-item" id="btn-open-settings">
+        <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.4-2.3l2-1.5-2-3.4-2.4.9a7 7 0 00-2-1.1L13.5 2h-3l-.7 2.6a7 7 0 00-2 1.1l-2.4-.9-2 3.4 2 1.5A7 7 0 005 12c0 .8.1 1.6.4 2.3l-2 1.5 2 3.4 2.4-.9a7 7 0 002 1.1l.7 2.6h3l.7-2.6a7 7 0 002-1.1l2.4.9 2-3.4-2-1.5c.3-.7.4-1.5.4-2.3z"/></svg>
+        <span data-i18n="settings">設定</span>
+      </button>
+      <button class="drawer-item" id="btn-open-about">
+        <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span data-i18n="about">關於引路人</span>
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- ============================== -->
+<!-- 「+」三選項菜單（changes_1_0 變更 1）-->
+<!-- ============================== -->
+<div id="attach-menu" class="attach-menu">
+  <div class="attach-mask"></div>
+  <div class="attach-sheet">
+    <button class="attach-opt" data-attach="camera">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <span data-i18n="photo">拍照</span>
+    </button>
+    <button class="attach-opt" data-attach="gallery">
+      <svg viewBox="0 0 24 24" width="22" height="22"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span data-i18n="gallery">從圖庫選擇照片／圖片／影片</span>
+    </button>
+    <button class="attach-opt" data-attach="file">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span data-i18n="upload">上傳檔案</span>
+    </button>
+    <button class="attach-cancel" id="attach-cancel" data-i18n="cancel">取消</button>
+  </div>
+</div>
+
+<!-- 隱藏的檔案選擇器 -->
+<input id="file-input-image" type="file" accept="image/*,video/*" style="display:none">
+<input id="file-input-doc" type="file" accept=".pdf,.docx,.pptx,.xlsx,.txt,.md" style="display:none">
+
+<!-- ============================== -->
+<!-- 設定 Modal -->
+<!-- ============================== -->
+<div id="modal-settings" class="modal">
+  <div class="modal-mask"></div>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <h3 data-i18n="settings">設定</h3>
+      <button class="icon-btn close-modal" data-modal="modal-settings">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="settings-body">
+      <!-- 由 app.js 動態填入 -->
+    </div>
+  </div>
+</div>
+
+<!-- 關於 Modal -->
+<div id="modal-about" class="modal">
+  <div class="modal-mask"></div>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <h3 data-i18n="about">關於引路人</h3>
+      <button class="icon-btn close-modal" data-modal="modal-about">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p class="about-brand"><span data-i18n="guide">引路人</span><span class="brand-en">Lumora</span></p>
+      <p class="about-slogan" data-i18n="slogan">指路與守心的那盞燈</p>
+      <p class="about-text" data-i18n="about_text">由 Final Kernel 真 AI 引擎驅動，整合 18 部子引擎與 92 部古籍知識，從個人運勢到國運大勢，萬事皆可問、皆可聊、皆可答。</p>
+      <p class="about-text" id="about-engines"></p>
+      <p class="about-text small">v3.0 · 2026</p>
+    </div>
+  </div>
+</div>
+
+<!-- 全屏 loader -->
+<div id="loading" class="loading">
+  <div class="loading-lamp"></div>
+  <div class="loading-text" data-i18n="loading">引路人正在推演……</div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script src="./i18n.js?v=3"></script>
+<script src="./data.js?v=3"></script>
+<script src="./app.js?v=3"></script>
+</body>
+</html>
