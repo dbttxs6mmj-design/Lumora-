@@ -595,6 +595,7 @@
             const vRes = await fetch(`${API_BASE}/vision/analyze`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              credentials: "include",
               body: JSON.stringify({ image_b64: _imageB64, question, language: state.lang }),
             });
             const vData = await vRes.json();
@@ -606,6 +607,7 @@
         const res = await fetch(`${API_BASE}/divine`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             question,
             profile: state.profile,
@@ -632,6 +634,7 @@
         const res = await fetch(`${API_BASE}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             message: question,
             profile: state.profile,
@@ -761,7 +764,7 @@
   // ==================================================================
   async function loadEnginesInfo() {
     try {
-      const res = await fetch(`${API_BASE}/engines`);
+      const res = await fetch(`${API_BASE}/engines`, { credentials: "include" });
       const data = await res.json();
       state.enginesMeta = data;
       // 寫進關於頁
