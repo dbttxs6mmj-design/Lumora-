@@ -29,11 +29,13 @@ router = APIRouter()
 
 # ─── Rate limit helper（從 main 匯入，不破壞啟動順序）───
 def _rate_limit_divine(request: Request):
+    from yinluren.main import rate_limit
     try:
-        from yinluren.main import rate_limit
         rate_limit(request, limit=int(os.environ.get("RATE_LIMIT_DIVINE", "20")), window_sec=60)
+    except HTTPException:
+        raise  # 真正超速：讓 FastAPI 回 429
     except Exception:
-        pass  # 靜默降級：rate limiter 失敗不影響正常請求
+        pass  # 其他內部錯誤（如 import 失敗）：靜默降級不影響正常請求
 
 UNCERTAIN_TIME = "不確定"
 SELF_PROFILE_LABEL = "我的命單"
