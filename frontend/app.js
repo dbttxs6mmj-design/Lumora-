@@ -408,22 +408,14 @@
     if (msg.result) {
       const r = msg.result;
       let html = "";
-        // 掀牌區塊：本次調用術數與古籍
-      if (r.engines_cited && r.engines_cited.length) {
-        const rows = r.engines_cited.map(e => {
-          const books = (e.books || []).map(b => `<span class="cited-book">${escapeHtml(b)}</span>`).join(" ");
-          return `<div class="cited-row"><span class="cited-engine">${escapeHtml(e.engine || e.source || "")}</span>${books ? " · " + books : ""}</div>`;
-        }).join("");
-        html += `<div class="engines-cited-block"><div class="engines-cited-title">📖 本次引用術數</div>${rows}</div>`;
-      }
-      if (r.core_conclusion) {
+        if (r.core_conclusion) {
         html += `<div>${escapeHtml(r.core_conclusion)}</div>`;
       }
       if (r.state) {
         html += `<div class="reading-block"><div class="reading-block-title">${t("rb_state")}</div><div>${escapeHtml(r.state)}</div></div>`;
       }
       if (r.multi_perspectives && r.multi_perspectives.length) {
-        html += `<div class="reading-block"><div class="reading-block-title">${t("rb_perspectives")}</div><ul>${r.multi_perspectives.map(p => `<li><b>${escapeHtml(p.engine || "")}</b>：${escapeHtml(p.view || p)}</li>`).join("")}</ul></div>`;
+        html += `<div class="reading-block"><div class="reading-block-title">${t("rb_perspectives")}</div><ul>${r.multi_perspectives.map(p => `<li>${escapeHtml(p.view || p)}</li>`).join("")}</ul></div>`;
       }
       if (r.resonance_points && r.resonance_points.length) {
         html += `<div class="reading-block"><div class="reading-block-title">${t("rb_resonance")}</div><ul>${r.resonance_points.map(p => `<li>${escapeHtml(p)}</li>`).join("")}</ul></div>`;

@@ -986,45 +986,6 @@ input, textarea, select { font-family: inherit; color: inherit; }
 .lang-btn .lang-zh { font-size: 12px; opacity: 0.5; letter-spacing: 0.05em; }
 
 /* ==========================================================
-   掀牌區塊（本次引用術數與古籍）
-   ========================================================== */
-
-.engines-cited-block {
-  margin-bottom: 10px;
-  padding: 8px 12px;
-  background: rgba(192,106,43,0.08);
-  border: 1px solid rgba(192,106,43,0.25);
-  border-radius: 10px;
-  font-size: 13px;
-}
-
-.engines-cited-title {
-  font-size: 12px;
-  color: var(--c-lamp-bright);
-  letter-spacing: 0.1em;
-  font-weight: 500;
-  margin-bottom: 5px;
-}
-
-.cited-row {
-  line-height: 1.7;
-  color: var(--c-paper-dim);
-}
-
-.cited-engine {
-  color: var(--c-lamp-bright);
-  font-weight: 500;
-}
-
-.cited-book {
-  color: var(--c-paper);
-  background: rgba(245,239,230,0.07);
-  border-radius: 4px;
-  padding: 0 4px;
-  margin: 0 1px;
-}
-
-/* ==========================================================
    打字中泡泡（三點跳動）
    ========================================================== */
 
