@@ -44,7 +44,10 @@
         lang: state.lang,
         profile: state.profile,
         profileComplete: state.profileComplete,
-        chats: state.chats,
+        chats: state.chats.map(c => ({
+          ...c,
+          messages: c.messages.map(({ image, ...rest }) => rest),
+        })),
         activeChatId: state.activeChatId,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
@@ -750,25 +753,29 @@
   let _pendingImage = null;
 
   function _showPendingImage() {
-    let preview = $("#pending-image-preview");
-    if (!preview) {
-      preview = document.createElement("div");
-      preview.id = "pending-image-preview";
-      preview.className = "pending-image-preview";
-      const img = document.createElement("img");
-      img.alt = "預覽";
-      const rmBtn = document.createElement("button");
-      rmBtn.className = "pending-image-remove";
-      rmBtn.textContent = "×";
-      rmBtn.addEventListener("click", () => {
-        _pendingImage = null;
-        preview.remove();
-      });
-      preview.appendChild(img);
-      preview.appendChild(rmBtn);
-      const chatComposer = document.querySelector("#screen-chat .composer");
-      if (chatComposer) chatComposer.parentNode.insertBefore(preview, chatComposer);
-    }
+    // Always remove any stale preview first
+    const existing = $("#pending-image-preview");
+    if (existing) existing.remove();
+
+    const preview = document.createElement("div");
+    preview.id = "pending-image-preview";
+    preview.className = "pending-image-preview";
+    const img = document.createElement("img");
+    img.alt = "預覽";
+    const rmBtn = document.createElement("button");
+    rmBtn.className = "pending-image-remove";
+    rmBtn.textContent = "×";
+    rmBtn.addEventListener("click", () => {
+      _pendingImage = null;
+      preview.remove();
+    });
+    preview.appendChild(img);
+    preview.appendChild(rmBtn);
+    // Insert above the composer of the currently visible screen
+    const activeScreen = document.querySelector(".screen.active");
+    const composer = (activeScreen && activeScreen.querySelector(".composer"))
+      || document.querySelector("#screen-chat .composer");
+    if (composer) composer.parentNode.insertBefore(preview, composer);
     preview.querySelector("img").src = _pendingImage.dataUrl;
   }
 

@@ -538,6 +538,8 @@ def run_llm_divination(
     _augment_section = ("\n\n" + "\n\n".join(_augment_parts) + "\n") if _augment_parts else ""
 
     # ─── 圖片 vision 描述注入 ───
+    _THIRD_PARTY_MARKERS = ("他", "她", "此人", "這個人", "這位", "圖中", "照片中", "圖片中", "這張", "對方", "那個人", "他的", "她的", "他們")
+    _is_third_party = bool(image_b64) and any(m in question for m in _THIRD_PARTY_MARKERS)
     _vision_section = ""
     if image_b64:
         try:
@@ -555,7 +557,17 @@ def run_llm_divination(
             )
             _vision_text = (_vision_resp.choices[0].message.content or "").strip()
             if _vision_text:
-                _vision_section = f"\n\n## 用戶上傳圖片（Vision 解析）\n{_vision_text}\n"
+                if _is_third_party:
+                    _vision_section = (
+                        f"\n\n## 用戶上傳第三方人物照片（非用戶本人）\n"
+                        f"圖片內容：{_vision_text}\n"
+                        f"⚠️ 重要：圖中人物不是用戶本人，而是第三方人士。"
+                        f"面相分析必須針對「圖片中的人物」，"
+                        f"全程使用「此人」「圖中人物」「他的」「她的」等第三人稱，"
+                        f"絕對不得使用「你的面相」「你的五官」「你的」等第二人稱。\n"
+                    )
+                else:
+                    _vision_section = f"\n\n## 用戶上傳圖片（Vision 解析）\n{_vision_text}\n"
         except Exception as _e:
             logger.warning("Vision analysis failed: %s", _e)
 
