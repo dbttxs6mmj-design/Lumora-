@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import re
@@ -5,7 +6,7 @@ from datetime import UTC, datetime
 from typing import Optional, Literal, Dict, Any
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel, Field, model_validator
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,72 @@ def _rate_limit_divine(request: Request):
         raise  # 真正超速：讓 FastAPI 回 429
     except Exception:
         pass  # 其他內部錯誤（如 import 失敗）：靜默降級不影響正常請求
+
+
+# ─── App 內登入閘（取代 nginx Basic Auth）───
+# 共用密碼制：朋友拿同一組密碼，登入後種 cookie，後續請求帶 cookie 過閘。
+ACCESS_PASSWORD = os.environ.get("LUMORA_ACCESS_PASSWORD", "a2ck416q")
+_AUTH_COOKIE = "lumora_session"
+_COOKIE_MAX_AGE = 60 * 60 * 24 * 90  # 90 天免重登
+
+
+def _expected_token() -> str:
+    """由密碼推導的 cookie 值；無密碼不可能算出，等同 bearer token。"""
+    secret = os.environ.get("LUMORA_SECRET", "")
+    return hashlib.sha256(f"{ACCESS_PASSWORD}:{secret}:lumora-gate-v1".encode("utf-8")).hexdigest()
+
+
+def _is_authed(request: Request) -> bool:
+    return request.cookies.get(_AUTH_COOKIE) == _expected_token()
+
+
+def _require_auth(request: Request):
+    """保護需付費 / LLM 端點：未登入回 401，前端據此跳登入頁。"""
+    if not _is_authed(request):
+        raise HTTPException(status_code=401, detail="未登入")
+
+
+def _rate_limit_login(request: Request):
+    from yinluren.main import rate_limit
+    try:
+        rate_limit(request, limit=int(os.environ.get("RATE_LIMIT_LOGIN", "10")), window_sec=60)
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+
+class LoginIn(BaseModel):
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+@router.post("/api/v1/login", tags=["auth"])
+def login(payload: LoginIn, response: Response, _rl: None = Depends(_rate_limit_login)):
+    """驗證共用密碼，成功則種 HttpOnly cookie。"""
+    if payload.password.strip() != ACCESS_PASSWORD:
+        raise HTTPException(status_code=401, detail="密碼錯誤")
+    response.set_cookie(
+        key=_AUTH_COOKIE,
+        value=_expected_token(),
+        max_age=_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=False,  # 站點走 http（sslip.io 直連），不可設 Secure 否則 cookie 種不上
+        path="/",
+    )
+    return {"status": "ok"}
+
+
+@router.get("/api/v1/auth/check", tags=["auth"])
+def auth_check(request: Request):
+    """前端啟動時呼叫：回傳是否已登入，決定是否顯示登入頁。"""
+    return {"authed": _is_authed(request)}
+
+
+@router.post("/api/v1/logout", tags=["auth"])
+def logout(response: Response):
+    response.delete_cookie(_AUTH_COOKIE, path="/")
+    return {"status": "ok"}
 
 UNCERTAIN_TIME = "不確定"
 SELF_PROFILE_LABEL = "我的命單"
@@ -683,7 +750,7 @@ def list_engine_summary():
 
 
 @router.post("/api/v1/divine", tags=["divine"])
-def divine_inline(payload: DivineInlineIn, _rl: None = Depends(_rate_limit_divine)):
+def divine_inline(payload: DivineInlineIn, _au: None = Depends(_require_auth), _rl: None = Depends(_rate_limit_divine)):
     """聊天式單次推演：接受 inline profile + chat_history，內部走 V7.6 Final Kernel。"""
     backend_profile = _ui_profile_to_backend(payload.profile)
     history = _sanitize_inline_history(payload.chat_history)
@@ -730,7 +797,7 @@ class ChatIn(BaseModel):
 
 
 @router.post("/api/v1/chat", tags=["chat"])
-def chat_inline(payload: ChatIn, _rl: None = Depends(_rate_limit_divine)):
+def chat_inline(payload: ChatIn, _au: None = Depends(_require_auth), _rl: None = Depends(_rate_limit_divine)):
     """閒聊／諮詢／日常對話（非命理推演），使用 instant 模型快速回應。"""
     import os as _os
     api_key = _os.environ.get("OPENAI_API_KEY")
@@ -795,7 +862,7 @@ class VisionIn(BaseModel):
 
 
 @router.post("/api/v1/vision/analyze", tags=["vision"])
-def vision_analyze(payload: VisionIn, _rl: None = Depends(_rate_limit_divine)):
+def vision_analyze(payload: VisionIn, _au: None = Depends(_require_auth), _rl: None = Depends(_rate_limit_divine)):
     """圖片 Vision 分析：面相 / 手相 / 場景 / 文字，回傳描述供前端顯示或進一步推演。"""
     import os as _os
     api_key = _os.environ.get("OPENAI_API_KEY")

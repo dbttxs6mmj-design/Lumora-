@@ -20,10 +20,10 @@
   // i18n 捷徑：t("key") / t("key", {name:"…"})；i18n.js 未載入時回 key 本身
   const t = (k, vars) => (window.LUMORA_I18N ? window.LUMORA_I18N.t(k, vars) : k);
 
-  // Basic Auth 過期攔截：nginx 回 401 時跳回根目錄觸發瀏覽器重新跳登入框
+  // 登入閘攔截：API 回 401（未登入 / cookie 過期）→ 顯示 App 內登入頁，不顯示錯誤
   function _authGuard(res) {
     if (res && res.status === 401) {
-      location.replace(location.origin + "/");
+      showLoginGate();
       throw new Error("auth_expired");
     }
     return res;
@@ -1076,6 +1076,73 @@
   }
 
   // ==================================================================
+  // 登入閘（取代 nginx Basic Auth）
+  // ==================================================================
+  function showLoginGate() {
+    const gate = $("#login-gate");
+    if (gate) {
+      gate.hidden = false;
+      const pw = $("#login-password");
+      if (pw) setTimeout(() => pw.focus(), 50);
+    }
+  }
+  function hideLoginGate() {
+    const gate = $("#login-gate");
+    if (gate) gate.hidden = true;
+  }
+
+  async function submitLogin() {
+    const pwEl = $("#login-password");
+    const errEl = $("#login-error");
+    const btn = $("#login-submit");
+    const password = (pwEl && pwEl.value || "").trim();
+    if (!password) { if (pwEl) pwEl.focus(); return; }
+    if (errEl) errEl.hidden = true;
+    if (btn) btn.disabled = true;
+    try {
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        if (pwEl) pwEl.value = "";
+        hideLoginGate();
+        bootApp();
+        return;
+      }
+      if (errEl) { errEl.textContent = t("login_err"); errEl.hidden = false; }
+    } catch (e) {
+      if (errEl) { errEl.textContent = t("login_err_net"); errEl.hidden = false; }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function setupLoginGate() {
+    const btn = $("#login-submit");
+    const pw = $("#login-password");
+    if (btn) btn.addEventListener("click", submitLogin);
+    if (pw) pw.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); submitLogin(); }
+    });
+  }
+
+  // 啟動時先驗證登入狀態：未登入顯示登入頁，已登入正常進 App
+  async function gateThenBoot() {
+    try {
+      const res = await fetch(`${API_BASE}/auth/check`, { credentials: "include" });
+      const data = await res.json();
+      if (data && data.authed) { bootApp(); }
+      else { showLoginGate(); }
+    } catch (e) {
+      // auth/check 失敗（後端不可達）→ 仍嘗試進 App，個別 API 401 會再跳登入頁
+      bootApp();
+    }
+  }
+
+  // ==================================================================
   // 啟動
   // ==================================================================
   function init() {
@@ -1140,7 +1207,15 @@
       m.parentElement.classList.remove("open");
     }));
 
-    // 進入點
+    // 登入閘事件綁定（一次性）
+    setupLoginGate();
+
+    // 驗證登入狀態 → 決定顯示登入頁或進 App
+    gateThenBoot();
+  }
+
+  // 通過登入閘後才進 App：決定進入點 + 載入引擎資訊
+  function bootApp() {
     if (state.profileComplete) {
       // 已 onboard 過 - 直接進首頁
       show("screen-home");
@@ -1148,7 +1223,6 @@
       // 首訪 - 從語言頁開始
       show("screen-lang");
     }
-
     loadEnginesInfo();
   }
 

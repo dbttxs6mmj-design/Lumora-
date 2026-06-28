@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b1530">
 <title>引路人Lumora</title>
-<link rel="stylesheet" href="./styles.css?v=5">
+<link rel="stylesheet" href="./styles.css?v=6">
 <!-- Vercel/CDN 部署時將此處替換為後端實際網址；同源部署時保持空字串 -->
 <script>window.__LUMORA_API__ = "";</script>
 </head>
@@ -351,6 +351,18 @@
   </div>
 </div>
 
+<!-- 登入閘（取代 nginx Basic Auth） -->
+<div id="login-gate" class="login-gate" hidden>
+  <div class="login-card">
+    <div class="login-brand"><span data-i18n="guide">引路人</span><span class="brand-en">Lumora</span></div>
+    <div class="login-slogan" data-i18n="login_slogan">輸入密碼，開啟你的引路人</div>
+    <input id="login-password" class="login-input" type="password" autocomplete="current-password"
+           inputmode="text" data-i18n-ph="login_ph" placeholder="請輸入密碼">
+    <div id="login-error" class="login-error" hidden></div>
+    <button id="login-submit" class="primary-btn login-btn" data-i18n="login_btn">進入</button>
+  </div>
+</div>
+
 <!-- 全屏 loader -->
 <div id="loading" class="loading">
   <div class="loading-lamp"></div>
@@ -360,8 +372,8 @@
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
-<script src="./i18n.js?v=5"></script>
-<script src="./data.js?v=5"></script>
-<script src="./app.js?v=5"></script>
+<script src="./i18n.js?v=6"></script>
+<script src="./data.js?v=6"></script>
+<script src="./app.js?v=6"></script>
 </body>
 </html>
