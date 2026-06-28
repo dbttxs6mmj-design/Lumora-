@@ -40,11 +40,13 @@ def _rate_limit_divine(request: Request):
         pass  # 其他內部錯誤（如 import 失敗）：靜默降級不影響正常請求
 
 
-# ─── App 內登入閘（取代 nginx Basic Auth）───
-# 共用密碼制：朋友拿同一組密碼，登入後種 cookie，後續請求帶 cookie 過閘。
+# ─── App 內登入閘（取代 nginx Basic Auth；預設全公開）───
+# 預設 LUMORA_REQUIRE_LOGIN 未設 → 全公開、零密碼（與「只傳熟人」的使用場景一致）。
+# 若未來想開啟密碼閘，設環境變數 LUMORA_REQUIRE_LOGIN=1 即可，前端登入頁與後端驗證自動生效。
 ACCESS_PASSWORD = os.environ.get("LUMORA_ACCESS_PASSWORD", "a2ck416q")
 _AUTH_COOKIE = "lumora_session"
 _COOKIE_MAX_AGE = 60 * 60 * 24 * 90  # 90 天免重登
+_LOGIN_REQUIRED = os.environ.get("LUMORA_REQUIRE_LOGIN", "").strip().lower() in ("1", "true", "yes", "on")
 
 
 def _expected_token() -> str:
@@ -54,11 +56,13 @@ def _expected_token() -> str:
 
 
 def _is_authed(request: Request) -> bool:
+    if not _LOGIN_REQUIRED:
+        return True  # 全公開模式：一律視為已通過
     return request.cookies.get(_AUTH_COOKIE) == _expected_token()
 
 
 def _require_auth(request: Request):
-    """保護需付費 / LLM 端點：未登入回 401，前端據此跳登入頁。"""
+    """保護需付費 / LLM 端點。全公開模式（預設）直接放行；開啟密碼閘時未登入回 401。"""
     if not _is_authed(request):
         raise HTTPException(status_code=401, detail="未登入")
 
