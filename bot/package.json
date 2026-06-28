@@ -1,0 +1,12 @@
+{
+  "name": "lumora-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "bot.mjs",
+  "scripts": { "start": "node bot.mjs" },
+  "dependencies": {
+    "grammy": "^1.31.0",
+    "@anthropic-ai/sdk": "^0.37.0",
+    "dotenv": "^16.4.7"
+  }
+}
