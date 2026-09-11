@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b1530">
 <title>引路人Lumora</title>
-<link rel="stylesheet" href="./styles.css?v=6">
+<link rel="stylesheet" href="./styles.css?v=7">
 <!-- Vercel/CDN 部署時將此處替換為後端實際網址；同源部署時保持空字串 -->
 <script>window.__LUMORA_API__ = "";</script>
 </head>
@@ -219,6 +219,7 @@
     <div class="home-hint" data-i18n="home_hint">把任何事都問引路人</div>
   </div>
 
+  <div id="target-chip-home" class="target-chip" hidden></div>
   <footer class="composer">
     <button id="btn-plus-home" class="composer-plus" data-i18n-aria="aria_attach" aria-label="附加">
       <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 5v14M5 12h14"/></svg>
@@ -246,6 +247,7 @@
 
   <div id="chat-list" class="chat-list"></div>
 
+  <div id="target-chip-chat" class="target-chip" hidden></div>
   <footer class="composer">
     <button id="btn-plus-chat" class="composer-plus" data-i18n-aria="aria_attach" aria-label="附加">
       <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 5v14M5 12h14"/></svg>
@@ -305,7 +307,104 @@
       <svg viewBox="0 0 24 24" width="22" height="22"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       <span data-i18n="upload">上傳檔案</span>
     </button>
+    <button class="attach-opt" data-attach="target">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><path d="M14.5 20a5 5 0 016.8-4.6"/></svg>
+      <span data-i18n="target_add">合盤：計算與他者的關係</span>
+    </button>
     <button class="attach-cancel" id="attach-cancel" data-i18n="cancel">取消</button>
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- 他者命盤 Modal（合盤／計算與他者的關係） -->
+<!-- ============================== -->
+<div id="modal-target" class="modal">
+  <div class="modal-mask"></div>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <div class="modal-title" data-i18n="target_title">他者命盤（合盤）</div>
+      <button class="icon-btn close-modal" data-modal="modal-target">
+        <svg viewBox="0 0 24 24" width="22" height="22"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="hint" data-i18n="target_intro">填入你想合盤的對象資料，引路人將推演「你與對方」的關係。時辰不確定沒關係——按「不確定」即自動啟動出生時辰反推。</div>
+      <div class="field">
+        <label><span data-i18n="target_relation">與你的關係</span> <span class="req">*</span></label>
+        <select id="tg-relation">
+          <option value="" data-i18n="please_select">請選擇</option>
+          <option value="配偶" data-i18n="rel_spouse">配偶</option>
+          <option value="伴侶" data-i18n="rel_partner">伴侶</option>
+          <option value="曖昧對象" data-i18n="rel_crush">曖昧對象／喜歡的人</option>
+          <option value="父" data-i18n="rel_father">父親</option>
+          <option value="母" data-i18n="rel_mother">母親</option>
+          <option value="子女" data-i18n="rel_child">子女</option>
+          <option value="手足" data-i18n="rel_sibling">兄弟姊妹</option>
+          <option value="朋友" data-i18n="rel_friend">朋友</option>
+          <option value="同事" data-i18n="rel_colleague">同事</option>
+          <option value="上司" data-i18n="rel_boss">上司／長官</option>
+          <option value="其他" data-i18n="rel_other">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label data-i18n="target_name">對方稱呼（可略）</label>
+        <input id="tg-name" type="text" data-i18n-ph="target_name_ph" placeholder="例如：太太、阿明、對方" maxlength="30">
+      </div>
+      <div class="field">
+        <label data-i18n="gender">性別</label>
+        <div class="seg-radio" id="tg-sex-group">
+          <button type="button" class="seg" data-tg-sex="M" data-i18n="male">男</button>
+          <button type="button" class="seg" data-tg-sex="F" data-i18n="female">女</button>
+        </div>
+      </div>
+      <div class="field">
+        <label data-i18n="birth_date">出生日期</label>
+        <input id="tg-birth-date" type="date">
+      </div>
+      <div class="field">
+        <label data-i18n="birth_time_mode_label">時辰知悉程度</label>
+        <div class="seg-radio" id="tg-time-mode-group">
+          <button type="button" class="seg active" data-tg-time-mode="exact" data-i18n="time_exact">精確時間</button>
+          <button type="button" class="seg" data-tg-time-mode="shichen" data-i18n="time_shichen">約時辰</button>
+          <button type="button" class="seg" data-tg-time-mode="unknown" data-i18n="time_unknown">不確定</button>
+        </div>
+      </div>
+      <div class="field" id="tg-exact-time-wrap">
+        <div class="row">
+          <select id="tg-birth-hour"><option value="" data-i18n="hour">小時</option></select>
+          <select id="tg-birth-minute"><option value="" data-i18n="minute">分</option></select>
+        </div>
+      </div>
+      <div class="field" id="tg-shichen-wrap" style="display:none">
+        <label data-i18n="birth_shichen_label">選擇時辰</label>
+        <select id="tg-birth-shichen">
+          <option value="" data-i18n="please_select">請選擇</option>
+          <option value="子時" data-hour="0">子時（夜半　23:00 ~ 01:00）</option>
+          <option value="丑時" data-hour="2">丑時（雞鳴　01:00 ~ 03:00）</option>
+          <option value="寅時" data-hour="4">寅時（平旦　03:00 ~ 05:00）</option>
+          <option value="卯時" data-hour="6">卯時（日出　05:00 ~ 07:00）</option>
+          <option value="辰時" data-hour="8">辰時（食時　07:00 ~ 09:00）</option>
+          <option value="巳時" data-hour="10">巳時（隅中　09:00 ~ 11:00）</option>
+          <option value="午時" data-hour="12">午時（日中　11:00 ~ 13:00）</option>
+          <option value="未時" data-hour="14">未時（日昳　13:00 ~ 15:00）</option>
+          <option value="申時" data-hour="16">申時（晡時　15:00 ~ 17:00）</option>
+          <option value="酉時" data-hour="18">酉時（日入　17:00 ~ 19:00）</option>
+          <option value="戌時" data-hour="20">戌時（黃昏　19:00 ~ 21:00）</option>
+          <option value="亥時" data-hour="22">亥時（人定　21:00 ~ 23:00）</option>
+        </select>
+      </div>
+      <div class="field" id="tg-unknown-time-hint" style="display:none">
+        <div class="hint" data-i18n="target_unknown_hint">✔ 已選「不確定」——引路人將啟動出生時辰反推專業流程，依你與對方的互動、性格與已知事件，推算對方最可能的時辰（附候選與置信度），無需擔心。</div>
+      </div>
+      <div class="field">
+        <label data-i18n="target_birthplace">出生地（可略）</label>
+        <input id="tg-birthplace" type="text" data-i18n-ph="target_birthplace_ph" placeholder="例如：新疆若羌、台北" maxlength="60">
+      </div>
+      <div class="ob-nav">
+        <button class="ghost-btn" id="tg-clear" data-i18n="target_clear">清除合盤</button>
+        <button class="primary-btn" id="tg-save" data-i18n="target_save">確定合盤</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -372,8 +471,8 @@
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
-<script src="./i18n.js?v=6"></script>
-<script src="./data.js?v=6"></script>
-<script src="./app.js?v=6"></script>
+<script src="./i18n.js?v=7"></script>
+<script src="./data.js?v=7"></script>
+<script src="./app.js?v=7"></script>
 </body>
 </html>

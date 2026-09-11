@@ -42,6 +42,7 @@
     activeChatId: null,
     onboardingStep: 1,
     enginesMeta: null,    // 從 /api/v1/engines 取
+    targetProfile: null,  // 合盤他者 { relation, name, sex, birth_date, birth_hour, birth_minute, birth_shichen, birth_time_unknown, birthplace }
   };
 
   // ==================================================================
@@ -58,6 +59,7 @@
           messages: c.messages.map(({ image, ...rest }) => rest),
         })),
         activeChatId: state.activeChatId,
+        targetProfile: state.targetProfile,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
     } catch (e) { console.warn("save failed", e); }
@@ -592,7 +594,8 @@
     // 近 6 輪歷史（只傳文字，不傳圖片 dataUrl）
     const history = chat.messages.slice(-12, -1).map(m => ({ role: m.role, content: m.content || "" }));
 
-    const useDivination = isDivinationIntent(question);
+    // 有合盤對象時，一律走推演（合盤本身即占卜）
+    const useDivination = isDivinationIntent(question) || !!state.targetProfile;
 
     try {
       let data;
@@ -613,12 +616,13 @@
             }
           } catch (_) {}
         }
-        // vision 描述注入 question；/divine 不帶 image_b64（避免 nginx 413）
-        const divineQuestion = visionDesc
-          ? `${question}\n\n【用戶上傳圖片（Vision 解析）】\n${visionDesc}`
-          : question;
-        // 把 vision 描述寫回 userMsg，確保後續 history 帶著「他是誰」
-        if (visionDesc) { userMsg.content = divineQuestion; saveState(); }
+        // vision 描述 + 合盤對象命盤，一併注入 question；/divine 不帶 image_b64（避免 nginx 413）
+        const targetBlock = _targetToBlock(state.targetProfile);
+        let divineQuestion = question;
+        if (targetBlock) divineQuestion += `\n\n${targetBlock}`;
+        if (visionDesc) divineQuestion += `\n\n【用戶上傳圖片（Vision 解析）】\n${visionDesc}`;
+        // 把注入後的內容寫回 userMsg，確保後續 history 帶著「對方是誰」與「他是誰」
+        if (targetBlock || visionDesc) { userMsg.content = divineQuestion; saveState(); }
         const res = _authGuard(await fetch(`${API_BASE}/divine`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -818,6 +822,8 @@
           inp.click();
         } else if (type === "file") {
           $("#file-input-doc").click();
+        } else if (type === "target") {
+          openTargetModal();
         }
       });
     });
@@ -837,6 +843,152 @@
       toast(t("toast_file_selected", { name: f.name }));
       e.target.value = "";
     });
+  }
+
+  // ==================================================================
+  // 他者命盤（合盤）
+  // ==================================================================
+  function setupTarget() {
+    // 填時 / 分
+    const hourSel = $("#tg-birth-hour");
+    LUMORA_DATA.hours.forEach(h => {
+      const opt = document.createElement("option");
+      opt.value = h; opt.textContent = h.toString().padStart(2, "0") + " 時";
+      hourSel.appendChild(opt);
+    });
+    const minSel = $("#tg-birth-minute");
+    LUMORA_DATA.minutes.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m; opt.textContent = m.toString().padStart(2, "0") + " 分";
+      minSel.appendChild(opt);
+    });
+
+    // 性別切換
+    $$("#tg-sex-group .seg").forEach(b => b.addEventListener("click", () => {
+      $$("#tg-sex-group .seg").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+    }));
+
+    // 時辰模式切換
+    $$("#tg-time-mode-group .seg").forEach(b => b.addEventListener("click", () => {
+      $$("#tg-time-mode-group .seg").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      _tgTimeMode(b.dataset.tgTimeMode);
+    }));
+
+    $("#tg-save").addEventListener("click", saveTarget);
+    $("#tg-clear").addEventListener("click", () => {
+      state.targetProfile = null;
+      saveState();
+      renderTargetChip();
+      closeModal("modal-target");
+      toast(t("target_cleared"));
+    });
+
+    // 清除合盤 chip 的 ✕（事件委派）
+    $$(".target-chip").forEach(chip => chip.addEventListener("click", (e) => {
+      if (e.target.closest(".target-chip-x")) {
+        state.targetProfile = null;
+        saveState();
+        renderTargetChip();
+      } else {
+        openTargetModal();
+      }
+    }));
+
+    renderTargetChip();
+  }
+
+  function _tgTimeMode(mode) {
+    $("#tg-exact-time-wrap").style.display = mode === "exact" ? "" : "none";
+    $("#tg-shichen-wrap").style.display = mode === "shichen" ? "" : "none";
+    $("#tg-unknown-time-hint").style.display = mode === "unknown" ? "" : "none";
+  }
+
+  function openTargetModal() {
+    const tp = state.targetProfile;
+    // 預填（若已有）或重置
+    $("#tg-relation").value = tp?.relation || "";
+    $("#tg-name").value = tp?.name || "";
+    $("#tg-birth-date").value = tp?.birth_date || "";
+    $("#tg-birthplace").value = tp?.birthplace || "";
+    $$("#tg-sex-group .seg").forEach(x => x.classList.toggle("active", x.dataset.tgSex === (tp?.sex || "")));
+    const mode = tp?.birth_time_unknown ? "unknown" : (tp?.birth_shichen ? "shichen" : "exact");
+    $$("#tg-time-mode-group .seg").forEach(x => x.classList.toggle("active", x.dataset.tgTimeMode === mode));
+    _tgTimeMode(mode);
+    $("#tg-birth-hour").value = (tp && tp.birth_hour != null) ? String(tp.birth_hour) : "";
+    $("#tg-birth-minute").value = (tp && tp.birth_minute != null) ? String(tp.birth_minute) : "";
+    $("#tg-birth-shichen").value = tp?.birth_shichen || "";
+    openModal("modal-target");
+  }
+
+  function saveTarget() {
+    const relation = $("#tg-relation").value;
+    if (!relation) { toast(t("target_need_relation")); return; }
+    const mode = ($("#tg-time-mode-group .seg.active") || {}).dataset?.tgTimeMode || "exact";
+    let birth_hour = null, birth_minute = null, birth_shichen = null, birth_time_unknown = false;
+    if (mode === "exact") {
+      birth_hour = $("#tg-birth-hour").value !== "" ? parseInt($("#tg-birth-hour").value, 10) : null;
+      birth_minute = $("#tg-birth-minute").value !== "" ? parseInt($("#tg-birth-minute").value, 10) : null;
+    } else if (mode === "shichen") {
+      const sel = $("#tg-birth-shichen");
+      birth_shichen = sel.value || null;
+      const opt = sel.options[sel.selectedIndex];
+      birth_hour = opt && opt.dataset.hour ? parseInt(opt.dataset.hour, 10) : null;
+    } else {
+      birth_time_unknown = true;
+    }
+    const sexBtn = $("#tg-sex-group .seg.active");
+    state.targetProfile = {
+      relation,
+      name: $("#tg-name").value.trim(),
+      sex: sexBtn ? sexBtn.dataset.tgSex : "",
+      birth_date: $("#tg-birth-date").value || "",
+      birth_hour, birth_minute, birth_shichen, birth_time_unknown,
+      birthplace: $("#tg-birthplace").value.trim(),
+    };
+    saveState();
+    renderTargetChip();
+    closeModal("modal-target");
+    toast(t("target_saved"));
+  }
+
+  function renderTargetChip() {
+    const tp = state.targetProfile;
+    ["#target-chip-home", "#target-chip-chat"].forEach(sel => {
+      const chip = $(sel);
+      if (!chip) return;
+      if (!tp) { chip.hidden = true; chip.innerHTML = ""; return; }
+      const who = (tp.name ? tp.name + "・" : "") + tp.relation;
+      chip.hidden = false;
+      chip.innerHTML = `<span class="target-chip-label">◎ ${t("target_chip_prefix")}${who}</span><button class="target-chip-x" aria-label="clear">×</button>`;
+    });
+  }
+
+  // 把他者命盤格式化成注入 question 的區塊
+  function _targetToBlock(tp) {
+    if (!tp) return "";
+    let timeStr;
+    if (tp.birth_time_unknown) {
+      timeStr = "不確定（請啟動出生時辰反推專業流程：依雙方互動、性格與已知事件推候選時辰＋置信度）";
+    } else if (tp.birth_shichen) {
+      timeStr = `${tp.birth_shichen}（取時辰中點）`;
+    } else if (tp.birth_hour != null) {
+      timeStr = `${String(tp.birth_hour).padStart(2, "0")}:${String(tp.birth_minute || 0).padStart(2, "0")}`;
+    } else {
+      timeStr = "未提供";
+    }
+    const sex = tp.sex === "M" ? "男" : (tp.sex === "F" ? "女" : "未填");
+    return [
+      "【對方命盤（合盤對象）】",
+      `與命主的關係：${tp.relation}`,
+      tp.name ? `稱呼：${tp.name}` : null,
+      `性別：${sex}`,
+      `生日：${tp.birth_date || "未提供"}`,
+      `出生時辰：${timeStr}`,
+      tp.birthplace ? `出生地：${tp.birthplace}` : null,
+      "請推演命主與此對象的關係（合盤）。",
+    ].filter(Boolean).join("\n");
   }
 
   // ==================================================================
@@ -1151,6 +1303,7 @@
     renderScene();
     setupOnboarding();
     setupAttach();
+    setupTarget();
     setupComposer("home-input", "btn-send-home");
     setupComposer("chat-input", "btn-send-chat");
     setupTapReactions();

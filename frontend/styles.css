@@ -1229,3 +1229,39 @@ input, textarea, select { font-family: inherit; color: inherit; }
   width: 100%;
   margin-top: 20px;
 }
+
+/* ==========================================================
+   合盤他者 chip（顯示在輸入框上方）
+   ========================================================== */
+.target-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 12px 6px;
+  padding: 8px 12px;
+  background: var(--c-card-strong);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  font-size: 14px;
+  color: var(--c-paper);
+  cursor: pointer;
+}
+.target-chip[hidden] { display: none; }
+.target-chip-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-lamp-bright);
+}
+.target-chip-x {
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  line-height: 1;
+  font-size: 18px;
+  border-radius: 50%;
+  color: var(--c-paper-dim);
+  background: rgba(255,255,255,0.06);
+}
+.target-chip-x:active { background: rgba(255,255,255,0.15); }
