@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0b1530">
 <title>引路人Lumora</title>
-<link rel="stylesheet" href="./styles.css?v=7">
+<link rel="stylesheet" href="./styles.css?v=8">
 <!-- Vercel/CDN 部署時將此處替換為後端實際網址；同源部署時保持空字串 -->
 <script>window.__LUMORA_API__ = "";</script>
 </head>
@@ -114,7 +114,7 @@
         <div class="seg-radio" id="ob-time-mode-group">
           <button class="seg active" data-time-mode="exact" data-i18n="time_exact">精確時間</button>
           <button class="seg" data-time-mode="shichen" data-i18n="time_shichen">約時辰</button>
-          <button class="seg" data-time-mode="unknown" data-i18n="time_unknown">不清楚</button>
+          <button class="seg" data-time-mode="unknown" data-i18n="time_unknown">不確定</button>
         </div>
       </div>
       <!-- 精確時間輸入 -->
@@ -164,8 +164,8 @@
     <div class="ob-step" data-step="4">
       <h2 class="ob-title" data-i18n="ob4_title">出生地點</h2>
       <div class="field">
-        <label data-i18n="country">國家 / 地區</label>
-        <input id="ob-country-search" type="text" data-i18n-ph="country_search_ph" placeholder="輸入搜尋國家…" autocomplete="off">
+        <label data-i18n="country">國家及地區</label>
+        <input id="ob-country-search" type="text" data-i18n-ph="country_search_ph" placeholder="輸入搜尋國家或地區…" autocomplete="off">
         <select id="ob-country" size="1"><option value="" data-i18n="please_select">請選擇</option></select>
       </div>
       <div class="field">
@@ -471,8 +471,8 @@
 <!-- Toast -->
 <div id="toast" class="toast"></div>
 
-<script src="./i18n.js?v=7"></script>
-<script src="./data.js?v=7"></script>
-<script src="./app.js?v=7"></script>
+<script src="./i18n.js?v=8"></script>
+<script src="./data.js?v=8"></script>
+<script src="./app.js?v=8"></script>
 </body>
 </html>

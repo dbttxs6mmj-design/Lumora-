@@ -3,6 +3,7 @@
 達成「選什麼語言、整個介面就變那個語言」。明鑑鏡心 D4 跨語種智慧共享 / M11 多語言流暢。"""
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -32,7 +33,7 @@ UI_STRINGS: Dict[str, str] = {
     "birth_time_mode_label": "時辰知悉程度",
     "time_exact": "精確時間",
     "time_shichen": "約時辰",
-    "time_unknown": "不清楚",
+    "time_unknown": "不確定",
     "birth_time_label": "時間（民用時，後端會自動校正真太陽時）",
     "hour": "小時",
     "minute": "分",
@@ -41,11 +42,11 @@ UI_STRINGS: Dict[str, str] = {
     "time_unknown_hint": "引路人將在推演中啟動《明鍵鏡心》出生時辰反推機制，結合您的問題、性格與人生軌跡，推算最可能的時辰，無需擔心。",
     "birth_time_hint": "時辰未知亦可，但有時辰才能完整啟動八字、紫微。",
     "ob4_title": "出生地點",
-    "country": "國家 / 地區",
+    "country": "國家及地區",
     "please_select": "請選擇",
     "region": "省 / 州 / 城市",
     "select_country_first": "請先選國家",
-    "country_search_ph": "輸入搜尋國家…",
+    "country_search_ph": "輸入搜尋國家或地區…",
     "province_search_ph": "輸入搜尋地區…",
     "birthplace_hint": "用於真太陽時的經度校正，出生地的地氣對命理推演影響深遠。",
     "ob5_title": "您目前的角色",
@@ -139,6 +140,12 @@ _CACHE: Dict[str, Dict[str, str]] = {}
 _LOCK = threading.Lock()
 _CACHE_DIR = Path(__file__).resolve().parent / "ui_i18n_cache"
 
+# 原文版本戳：UI_STRINGS 一改，雜湊即變，所有語言的舊快取自動失效重譯，
+# 保證「各語種同步」——不需手動刪快取。
+_SRC_VERSION = hashlib.md5(
+    json.dumps(UI_STRINGS, ensure_ascii=False, sort_keys=True).encode("utf-8")
+).hexdigest()
+
 
 def is_rtl(lang: Optional[str]) -> bool:
     return (lang or "").split("-")[0].lower() in RTL_LANGS
@@ -162,9 +169,12 @@ def get_bundle(lang: Optional[str]) -> Dict[str, str]:
         if f.exists():
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
-                merged = {**UI_STRINGS, **{k: v for k, v in data.items() if isinstance(v, str) and v.strip()}}
-                _CACHE[code] = merged
-                return merged
+                # 原文版本不符 → 舊快取失效，落到下方重新翻譯
+                if data.get("__src__") == _SRC_VERSION:
+                    merged = {**UI_STRINGS, **{k: v for k, v in data.items()
+                                               if k != "__src__" and isinstance(v, str) and v.strip()}}
+                    _CACHE[code] = merged
+                    return merged
             except Exception:
                 pass
 
@@ -175,7 +185,9 @@ def get_bundle(lang: Optional[str]) -> Dict[str, str]:
         _CACHE[code] = bundle
     try:
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        _cache_file(code).write_text(json.dumps(bundle, ensure_ascii=False), encoding="utf-8")
+        _cache_file(code).write_text(
+            json.dumps({**bundle, "__src__": _SRC_VERSION}, ensure_ascii=False), encoding="utf-8"
+        )
     except Exception:
         pass
     return bundle
