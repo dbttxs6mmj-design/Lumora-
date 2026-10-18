@@ -196,6 +196,29 @@
     return t.length > 10 && QUESTION_MARKERS.test(t);
   }
 
+  // 偵測「這句話」寫的是什麼語言／文字，讓回覆跟著訊息走、而不是跟著介面語言設定走
+  // （介面選繁體但打簡體 → 回簡體；打英文 → 回英文；寫書面粵語 → 回粵語）
+  function detectMessageLang(text) {
+    const t = (text || "").trim();
+    if (!t) return state.lang;
+    if (/[぀-ヿ]/.test(t)) return "ja";        // 假名
+    if (/[가-힯]/.test(t)) return "ko";        // 諺文
+    if (/[฀-๿]/.test(t)) return "th";
+    if (/[؀-ۿ]/.test(t)) return "ar";
+    if (/[Ѐ-ӿ]/.test(t)) return "ru";
+    const han = (t.match(/[一-鿿]/g) || []).length;
+    const latin = (t.match(/[A-Za-z]/g) || []).length;
+    if (han === 0 && latin >= 2) return "en";           // 純拉丁字母（含西／法／葡等，交給模型鏡像）
+    if (han === 0) return state.lang;                   // 純符號／數字 → 跟介面
+    if (/[係唔嘅咗啲嘢咁冇佢哋喺]|點解|乜嘢/.test(t)) return "yue";  // 書面粵語標記
+    // 簡／繁：各取一組「只在該文字出現」的常用字計數
+    const simp = (t.match(/[这个们么说对时会国为来发问题还没过现实开关动点让样产业经济应该务请谢爱变记觉识认给种长间]/g) || []).length;
+    const trad = (t.match(/[這個們麼說對時會國為來發問題還沒過現實開關動點讓樣產業經濟應該務請謝愛變記覺識認給種長間]/g) || []).length;
+    if (simp > trad) return "zh-Hans";
+    if (trad > simp) return "zh-Hant";
+    return state.lang;                                  // 全是簡繁共用字，無法分辨 → 跟介面
+  }
+
   // ==================================================================
   // 場景 SVG（夜色山路 + 雙人剪影 + 古燈）
   // ==================================================================
@@ -614,6 +637,8 @@
 
     // 合盤對象只在「真的在問」時注入推演；不再強制每句話都起卦（「操你媽」不是在算你媽）
     const useDivination = isDivinationIntent(question);
+    // 這句話用什麼語言寫的 → 回覆就用什麼語言（介面語言只是後備）
+    const msgLang = detectMessageLang(question);
 
     try {
       let data;
@@ -650,6 +675,7 @@
             profile: state.profile,
             chat_history: history,
             language: state.lang,
+            message_lang: msgLang,
             use_thinking: false,
           }),
         }));
@@ -684,6 +710,7 @@
             profile: state.profile,
             chat_history: history,
             language: state.lang,
+            message_lang: msgLang,
           }),
         }));
         data = await res.json();

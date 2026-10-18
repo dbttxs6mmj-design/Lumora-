@@ -671,6 +671,7 @@ class DivineInlineIn(BaseModel):
     chat_history: Optional[list[Dict[str, Any]]] = None
     language: Optional[str] = None
     use_thinking: bool = False
+    message_lang: Optional[str] = None  # 前端偵測「這句話」的語言；回覆語言以此為準，language 只是後備
     image_b64: Optional[str] = None  # base64 圖片（不含 data: prefix）
 
     @model_validator(mode="after")
@@ -762,7 +763,7 @@ def divine_inline(payload: DivineInlineIn, _au: None = Depends(_require_auth), _
         out = run_llm_divination(
             profile=backend_profile,
             question=payload.question,
-            language=payload.language or DEFAULT_LANGUAGE,
+            language=(payload.message_lang or payload.language or DEFAULT_LANGUAGE),
             clarification_answers={},
             conversation_history=history,
             deep_reasoning=bool(payload.use_thinking),
@@ -791,6 +792,7 @@ class ChatIn(BaseModel):
     profile: Optional[Dict[str, Any]] = None
     chat_history: Optional[list] = None
     language: Optional[str] = None
+    message_lang: Optional[str] = None  # 前端偵測「這句話」的語言；回覆語言以此為準，language 只是後備
 
     @model_validator(mode="after")
     def _strip_message(self):
@@ -816,10 +818,13 @@ def chat_inline(payload: ChatIn, _au: None = Depends(_require_auth), _rl: None =
     history = _sanitize_inline_history(payload.chat_history)
     p = payload.profile or {}
     name = ((p.get("nickname") or p.get("name") or "").strip()) or "旅人"
-    lang = (payload.language or "zh-Hant-TW").strip()
+    # 回覆語言跟著「這句話」走（前端偵測的 message_lang），介面語言只是後備
+    lang = ((getattr(payload, "message_lang", None) or payload.language or "zh-Hant-TW")).strip()
     _lang_map = {
         "zh-Hant": "繁體中文（台灣）", "zh-Hant-TW": "繁體中文（台灣）",
-        "zh-Hant-HK": "繁體中文（香港）", "zh-Hans": "简体中文", "en": "English",
+        "zh-Hant-HK": "繁體中文（香港）", "zh-Hans": "简体中文",
+        "yue": "書面粵語（係／唔／嘅／咗／點解）", "en": "English",
+        "ja": "日本語", "ko": "한국어", "th": "ไทย", "ar": "العربية", "ru": "Русский",
     }
     lang_dir = "" if lang.lower() in ("zh-hant", "zh-hant-tw", "zh", "", "zh-tw") else f"請用{_lang_map.get(lang, lang)}回覆。"
 
@@ -840,7 +845,13 @@ def chat_inline(payload: ChatIn, _au: None = Depends(_require_auth), _rl: None =
         "- 只有當用戶明確表達自殺或自我傷害的念頭時，才停下閒聊，溫暖但不囉嗦地關心，並給當地危機熱線"
         "（台灣 1925／1995／1980、美國 988、英國 Samaritans 116 123、全球 befrienders.org）。憤怒、罵人、難過、壓力大本身都不算，照常聊。\n"
         "【禁止】\n"
-        "- 禁止開場白（「我在這裡」「我聽到了」）、禁止結尾說教、禁止條列式治療建議、禁止一律回 3～5 句的固定長度——該短就短。"
+        "- 禁止開場白（「我在這裡」「我聽到了」）、禁止結尾說教、禁止條列式治療建議、禁止一律回 3～5 句的固定長度——該短就短。\n"
+        "【語言鏡像】\n"
+        "- 回覆語言跟著用戶「這一句」走：繁體回繁體、简体回简体、書面粵語（係／唔／嘅／咗）回書面粵語、英文回英文、中英夾雜就同樣夾雜。上面的語言指示只是後備。\n"
+        "【情緒識別（讀了就用，但永遠不說出口）】\n"
+        "- 先讀出這句的情緒：憤怒／宣洩、焦慮／急、悲傷、興奮、玩笑、挑釁、冷靜。情緒只決定你「怎麼說」，不決定「說不說」。\n"
+        "- 憤怒／宣洩 → 短、直，可以接住也可以頂回去；焦慮／急 → 先給答案；悲傷 → 一句穩穩托住，不灑糖；興奮 → 跟著亮，該潑的冷水照潑；玩笑 → 回玩笑；挑釁 → 不上鉤，一句乾的。\n"
+        "- 絕不把情緒說回去（禁「你現在很生氣」「我感受到你的焦慮」「我理解你的心情」），除非用戶自己先說；絕不診斷、絕不轉介。"
     )
 
     messages = [{"role": "system", "content": system_prompt}]
