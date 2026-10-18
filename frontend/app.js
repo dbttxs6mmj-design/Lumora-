@@ -135,6 +135,22 @@
     /^(再見|掰掰|bye|晚點見)[！!。,，\s]*$/i,
   ];
 
+  // 髒話／宣洩／情緒反應／一字一句的閒聊 → 一律走 /chat，絕不起卦
+  // （「操你媽」是在罵人，不是在算你跟你媽）
+  // 髒話只抓明確罵人用法，避免誤傷「操作」「幹部」「可靠」「干支」「他媽媽」
+  const VENT_PATTERNS = [
+    /(操你|肏|幹你|幹他|幹她|幹咧|幹啦|幹死|^幹[！!]?$|他媽的|她媽的|你媽的|操你媽|幹你媽|^(他|她|你)媽[！!]?$|靠北|靠腰|靠杯|靠夭|^靠[！!啦]?$|去死|^滾|滾開|滾蛋|白癡|白痴|智障|腦殘|垃圾|廢物|賤人|賤貨|婊子|雞掰|機掰|三小|沙小|放屁|狗屁|屁啦|fuck|shit|wtf|bitch|asshole|damn)/i,
+    /^(氣死|煩死|累死|笑死|無言|無語|崩潰|受不了|爛透|有夠爛|夠了|算了|隨便|不管了|好煩|好累|好氣|好難過|好想哭|想哭|唉|哎|嘖|呵呵|哈哈+|哭哭|嗚嗚|QQ|lol|lmao|omg)[！!。,，~～\s]*$/i,
+    /^(蛤|啊+|哦+|喔+|欸+|嗯+|呃+|額+|哼|嘻+|哇+|嗯哼|呦|喲|哎呀|哎喲|天啊|我的天|天哪)[？?！!。,，~～\s]*$/i,
+    /^(真的假的|真假|然後呢|所以呢|所以|然後|不是吧|不會吧|是喔|是嗎|是哦|真的嗎|真的喔|騙人|怎麼會|怎會|什麼|什麼意思|啥|啥意思|沒事|沒什麼|沒有|不用|不要|不是|對|對啊|對阿|沒錯|是的|好吧|好啦|行|行吧|可以|OK啦|知道了|了解|明白|收到)[？?！!。,，~～\s]*$/i,
+    /^(你誰|你是誰|你幹嘛|你在幹嘛|你想幹嘛|你什麼意思|你說什麼|你在說什麼|你懂什麼|你閉嘴|閉嘴|不要說了|別說了|夠了啦)[？?！!。,，~～\s]*$/i,
+    /^[\p{P}\p{S}\s]+$/u,              // 純標點／符號／emoji
+    /^[A-Za-z\s'!?.,]{1,12}$/,         // 極短英文反應：no / what / why / ok bro
+  ];
+
+  // 「真的在問」才走推演：要嘛命中推演關鍵詞，要嘛是夠長且帶疑問意圖的句子
+  const QUESTION_MARKERS = /[?？]|嗎|呢$|怎麼|怎樣|如何|該不該|能不能|會不會|是不是|有沒有|為什麼|為何|要不要|可不可以|適不適合|好不好|行不行/;
+
   // 明確要推演的關鍵詞（擴充版）
   const DIVINATION_KEYWORDS = [
     // 直接占卜術語
@@ -166,16 +182,18 @@
   ];
 
   function isDivinationIntent(text) {
-    // 短訊息且符合純閒聊 pattern → 走 chat
-    if (text.length <= 15 && CHAT_ONLY_PATTERNS.some(r => r.test(text.trim()))) {
-      return false;
-    }
-    // 命中任一推演關鍵詞 → 走 divine
-    if (DIVINATION_KEYWORDS.some(k => text.includes(k))) {
-      return true;
-    }
-    // 預設：長度 > 10 字的問題一律走推演（引路人的用戶幾乎不是來閒聊的）
-    return text.length > 10;
+    const t = (text || "").trim();
+    if (!t) return false;
+    const hasKeyword = DIVINATION_KEYWORDS.some(k => t.includes(k));
+    // 1) 髒話／宣洩／反應詞／一字一句 → 閒聊，絕不起卦
+    //    （若同一句裡同時有明確推演關鍵詞，例如「幹，該不該離職」，仍視為在問，走推演）
+    if (!hasKeyword && VENT_PATTERNS.some(r => r.test(t))) return false;
+    // 2) 純問候／致謝／應答 → 閒聊
+    if (t.length <= 15 && CHAT_ONLY_PATTERNS.some(r => r.test(t))) return false;
+    // 3) 命中推演關鍵詞 → 推演
+    if (hasKeyword) return true;
+    // 4) 其餘：要「夠長」且「像在問問題」才推演；單純敘述、抱怨、閒聊 → /chat
+    return t.length > 10 && QUESTION_MARKERS.test(t);
   }
 
   // ==================================================================
@@ -594,8 +612,8 @@
     // 近 6 輪歷史（只傳文字，不傳圖片 dataUrl）
     const history = chat.messages.slice(-12, -1).map(m => ({ role: m.role, content: m.content || "" }));
 
-    // 有合盤對象時，一律走推演（合盤本身即占卜）
-    const useDivination = isDivinationIntent(question) || !!state.targetProfile;
+    // 合盤對象只在「真的在問」時注入推演；不再強制每句話都起卦（「操你媽」不是在算你媽）
+    const useDivination = isDivinationIntent(question);
 
     try {
       let data;
@@ -652,12 +670,17 @@
           chat.messages.push({ role: "assistant", content: data.error || t("err_incomplete") });
         }
       } else {
+        // 閒聊也帶上合盤對象的背景，讓「她今天沒回我」這類話知道「她」是誰（只作提示，不主動提起）
+        const _tp = state.targetProfile;
+        const chatMessage = _tp
+          ? `${question}\n\n（背景提示：用戶目前設定的合盤對象是「${(_tp.name ? _tp.name + "・" : "") + _tp.relation}」；只有在用戶這句話明顯指向此人時才參考，否則忽略、不要主動提起。）`
+          : question;
         const res = _authGuard(await fetch(`${API_BASE}/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            message: question,
+            message: chatMessage,
             profile: state.profile,
             chat_history: history,
             language: state.lang,
