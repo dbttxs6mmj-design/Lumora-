@@ -126,12 +126,12 @@ UI_STRINGS: Dict[str, str] = {
 
 RTL_LANGS = {"ar", "fa", "ur"}
 
+# 系統只支援四語；四語之外的碼不翻譯，get_bundle 直接退回繁中原文
 _LANG_FULL = {
-    "zh-Hant": "Traditional Chinese", "zh-Hans": "Simplified Chinese", "yue": "Cantonese (written, colloquial)",
-    "en": "English", "ja": "Japanese", "ko": "Korean", "es": "Spanish", "fr": "French",
-    "pt": "Portuguese", "nl": "Dutch", "ru": "Russian", "tr": "Turkish", "ar": "Arabic",
-    "fa": "Persian (Farsi)", "hi": "Hindi", "ur": "Urdu", "bn": "Bengali", "ta": "Tamil",
-    "th": "Thai", "vi": "Vietnamese", "ms": "Malay / Indonesian", "sw": "Swahili",
+    "zh-Hant": "Traditional Chinese (Taiwan usage)",
+    "zh-Hans": "Simplified Chinese (Mainland China usage)",
+    "yue": "Cantonese (written, colloquial, Hong Kong usage)",
+    "en": "English",
 }
 
 _DEFAULT_CODES = {"", "zh", "zh-tw", "zh-hant", "zh-hant-tw"}
@@ -194,7 +194,9 @@ def get_bundle(lang: Optional[str]) -> Dict[str, str]:
 
 
 def _translate(code: str) -> Optional[Dict[str, str]]:
-    target = _LANG_FULL.get(code) or _LANG_FULL.get(code.split("-")[0].lower()) or code
+    target = _LANG_FULL.get(code) or _LANG_FULL.get(code.split("-")[0].lower())
+    if not target:
+        return None  # 四語之外：不翻譯，由 get_bundle 退回繁中原文
     try:
         from openai import OpenAI
 

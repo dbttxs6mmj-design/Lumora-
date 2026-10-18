@@ -198,17 +198,13 @@
 
   // 偵測「這句話」寫的是什麼語言／文字，讓回覆跟著訊息走、而不是跟著介面語言設定走
   // （介面選繁體但打簡體 → 回簡體；打英文 → 回英文；寫書面粵語 → 回粵語）
+  // 系統只支援四語：zh-Hant（台灣）／zh-Hans（大陸）／yue（香港）／en；其他語種一律回介面語言
   function detectMessageLang(text) {
     const t = (text || "").trim();
     if (!t) return state.lang;
-    if (/[぀-ヿ]/.test(t)) return "ja";        // 假名
-    if (/[가-힯]/.test(t)) return "ko";        // 諺文
-    if (/[฀-๿]/.test(t)) return "th";
-    if (/[؀-ۿ]/.test(t)) return "ar";
-    if (/[Ѐ-ӿ]/.test(t)) return "ru";
     const han = (t.match(/[一-鿿]/g) || []).length;
     const latin = (t.match(/[A-Za-z]/g) || []).length;
-    if (han === 0 && latin >= 2) return "en";           // 純拉丁字母（含西／法／葡等，交給模型鏡像）
+    if (han === 0 && latin >= 2) return "en";           // 純拉丁字母 → English
     if (han === 0) return state.lang;                   // 純符號／數字 → 跟介面
     if (/[係唔嘅咗啲嘢咁冇佢哋喺]|點解|乜嘢/.test(t)) return "yue";  // 書面粵語標記
     // 簡／繁：各取一組「只在該文字出現」的常用字計數

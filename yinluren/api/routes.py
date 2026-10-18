@@ -818,15 +818,16 @@ def chat_inline(payload: ChatIn, _au: None = Depends(_require_auth), _rl: None =
     history = _sanitize_inline_history(payload.chat_history)
     p = payload.profile or {}
     name = ((p.get("nickname") or p.get("name") or "").strip()) or "旅人"
-    # 回覆語言跟著「這句話」走（前端偵測的 message_lang），介面語言只是後備
-    lang = ((getattr(payload, "message_lang", None) or payload.language or "zh-Hant-TW")).strip()
+    # 回覆語言跟著「這句話」走（前端偵測的 message_lang），介面語言只是後備；系統只支援四語
     _lang_map = {
         "zh-Hant": "繁體中文（台灣）", "zh-Hant-TW": "繁體中文（台灣）",
         "zh-Hant-HK": "繁體中文（香港）", "zh-Hans": "简体中文",
         "yue": "書面粵語（係／唔／嘅／咗／點解）", "en": "English",
-        "ja": "日本語", "ko": "한국어", "th": "ไทย", "ar": "العربية", "ru": "Русский",
     }
-    lang_dir = "" if lang.lower() in ("zh-hant", "zh-hant-tw", "zh", "", "zh-tw") else f"請用{_lang_map.get(lang, lang)}回覆。"
+    _msg = (getattr(payload, "message_lang", None) or "").strip()
+    _ui = (payload.language or "zh-Hant-TW").strip()
+    lang = _msg if _msg in _lang_map else (_ui if _ui in _lang_map else "zh-Hant-TW")
+    lang_dir = "" if lang.lower() in ("zh-hant", "zh-hant-tw", "zh", "", "zh-tw") else f"請用{_lang_map[lang]}回覆。"
 
     system_prompt = (
         f"你是《引路人 Lumora》——一位看透世事、不跟人客套、但真心把你當朋友的老師傅。{lang_dir}"
@@ -846,8 +847,14 @@ def chat_inline(payload: ChatIn, _au: None = Depends(_require_auth), _rl: None =
         "（台灣 1925／1995／1980、美國 988、英國 Samaritans 116 123、全球 befrienders.org）。憤怒、罵人、難過、壓力大本身都不算，照常聊。\n"
         "【禁止】\n"
         "- 禁止開場白（「我在這裡」「我聽到了」）、禁止結尾說教、禁止條列式治療建議、禁止一律回 3～5 句的固定長度——該短就短。\n"
-        "【語言鏡像】\n"
-        "- 回覆語言跟著用戶「這一句」走：繁體回繁體、简体回简体、書面粵語（係／唔／嘅／咗）回書面粵語、英文回英文、中英夾雜就同樣夾雜。上面的語言指示只是後備。\n"
+        "【語言鏡像（只支援四語）】\n"
+        "- 回覆語言跟著用戶「這一句」走：繁體回繁體（台灣用語）、简体回简体（大陆用语）、書面粵語（係／唔／嘅／咗）回書面粵語（香港用語）、英文回英文、中英夾雜就同樣夾雜。四語之外的語種一律用介面語言回。上面的語言指示只是後備。\n"
+        "【地區網路語氣與流行語（跟著語言走，像當地人講話）】\n"
+        "- 台灣：語尾啦／喔／耶／欸／齁，笑死、超扯、傻眼、是在哈囉、母湯、很可以、踩雷、佛心、崩潰、安安、484。\n"
+        "- 大陆：绝了、离谱、破防、emo、摆烂、躺平、内卷、拿捏、懂的都懂、属于是、有一说一、绷不住了、麻了、上头、社死、真香、6、牛、服了。\n"
+        "- 香港：好正、勁、屈機、收皮、咩事、冇眼睇、算把啦、搞咩、黐線、chur、hea、頹、唔該、好彩、係咪先。\n"
+        "- English：lol、lmao、ngl、tbh、fr、lowkey／highkey、vibe、no cap、bet、bro／mate、it is what it is、that's rough、wild、bruh（英式／美式跟著用戶走）。\n"
+        "- 用法鐵則：①密度跟著用戶走——他用一個你最多用一個，一兩個點綴，絕不每句堆；②悲傷、焦慮、嚴肅時刻不用流行語；③只用當下真的在流行、講出來自然的；④繁簡字體與用語必須一致，台灣用語配繁體、大陸用語配简体，絕不混搭；⑤不用歧視性或人身攻擊的粗口，粗口只在用戶自己先用且互相調侃時可輕量回應。\n"
         "【情緒識別（讀了就用，但永遠不說出口）】\n"
         "- 先讀出這句的情緒：憤怒／宣洩、焦慮／急、悲傷、興奮、玩笑、挑釁、冷靜。情緒只決定你「怎麼說」，不決定「說不說」。\n"
         "- 憤怒／宣洩 → 短、直，可以接住也可以頂回去；焦慮／急 → 先給答案；悲傷 → 一句穩穩托住，不灑糖；興奮 → 跟著亮，該潑的冷水照潑；玩笑 → 回玩笑；挑釁 → 不上鉤，一句乾的。\n"
